@@ -10,12 +10,11 @@ export default function PlayGround() {
   const [me, setMe] = useState("");
   const [name, setName] = useState("");
   const [roomId, setRoomId] = useState("");
-  const [peers, setPeers] = useState({});
+  const [roomFull, setRoomFull] = useState(false);
   const myVideo = useRef();
 
-  useEffect(() => {}, []);
-
   useEffect(() => {
+    // getUserMedia - Get user permission to use their camera and audio and then assign the camera video to a video reference
     navigator.mediaDevices
       .getUserMedia({ video: true, audio: true })
       .then((currentStream) => {
@@ -26,64 +25,45 @@ export default function PlayGround() {
         console.log("Camera/Audio Rejected!", error);
       });
 
+    // set local user id
     socket.on("me", (id) => {
       setMe(id);
     });
 
     const newName = GenerateName();
     setName(newName);
-    socket.emit("set-name", newName);
+  }, []);
 
-    socket.on("user-joined", ({ userId, userName }) => {
-      console.log(`${userId} joined the room with username of ${userName}`);
-      setPeers((prevPeers) => ({
-        ...prevPeers,
-        [userId]: userName,
-      }));
-    });
-
-    socket.on("user-left", ({ userId }) => {
-      setPeers((prevPeers) => {
-        const newPeers = { ...prevPeers };
-        delete newPeers[userId];
-        return newPeers;
-      });
-    });
-
-    socket.on("all-users", (users) => {
-      const newPeers = users.reduce((acc, { userId, userName }) => {
-        acc[userId] = userName;
-        return acc;
-      }, {});
-      setPeers(newPeers);
-    });
-
-    return () => {
-      socket.off("user-joined");
-      socket.off("user-left");
-      socket.off("all-users");
-    };
-  }, [peers, roomId]);
+  useEffect(() => {
+    if (me && name) {
+      socket.emit("add-user", { socketID: me, localName: name });
+    }
+  }, [me, name]);
 
   const createRoom = () => {
-    const newRoomId = uuidv4();
-    setRoomId(newRoomId);
-    socket.emit("join-room", newRoomId);
+    socket.emit("create-room", (newRoomID) => {
+      setRoomId(newRoomID);
+      console.log(`Room created with ID: ${newRoomID}`);
+    });
   };
 
   const joinRoom = () => {
-    if (roomId) {
-      socket.emit("join-room", roomId);
-    }
+    socket.emit("join-room", roomId, (response) => {
+      if (response.success) {
+        console.log(`Joined room: ${roomId}`);
+      } else {
+        console.log(`Failed to join room: ${response.message}`);
+      }
+    });
   };
 
   const leaveRoom = () => {
-    if (roomId) {
-      socket.emit("leave-room", roomId);
-      setRoomId("");
-      setPeers({});
-      setStream(null);
-    }
+    socket.emit("leave-room", roomId);
+    setRoomId(""); // Clear the room ID on leave
+  };
+
+  const copyRoomId = () => {
+    navigator.clipboard.writeText(roomId);
   };
 
   return (
@@ -97,6 +77,9 @@ export default function PlayGround() {
         onChange={(e) => setRoomId(e.target.value)}
         className="mb-4"
       />
+      <button onClick={copyRoomId} className="mb-4 bg-orange-500 text-white p-2">
+        Copy Room ID
+      </button>
       <button onClick={createRoom} className="mb-4 bg-green-500 text-white p-2">
         Create Room
       </button>
@@ -111,9 +94,6 @@ export default function PlayGround() {
       </div>
       <div>
         <p>Users In Room:</p>
-        {Object.entries(peers).map(([userId, userName]) => (
-          <p key={userId}>{userName}</p>
-        ))}
       </div>
     </div>
   );
