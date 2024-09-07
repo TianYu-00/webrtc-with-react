@@ -39,7 +39,6 @@ io.on("connection", (socket) => {
     const user = listOfUsers[socket.id];
 
     if (user.currentRoom) {
-      // handle already in room, force them to leave it first
       socket.leave(user.currentRoom);
       const oldRoom = listOfRooms[user.currentRoom];
       if (oldRoom) {
@@ -75,7 +74,6 @@ io.on("connection", (socket) => {
 
       if (room.length < 2) {
         if (user.currentRoom) {
-          // handle already in room, force them to leave it first
           socket.leave(user.currentRoom);
           const oldRoom = listOfRooms[user.currentRoom];
           if (oldRoom) {
@@ -115,10 +113,46 @@ io.on("connection", (socket) => {
         socket.leave(roomId);
         console.log(`${socket.id} left room ${roomId}`);
         if (room.length === 0) {
-          delete listOfRooms[roomId]; // remove room when room is empty
+          delete listOfRooms[roomId];
           console.log(`Room ${roomId} deleted`);
         }
         user.currentRoom = null;
+      }
+    }
+  });
+
+  // RTC - Offer
+  socket.on("offer", (offer) => {
+    const user = listOfUsers[socket.id];
+    const room = listOfRooms[user.currentRoom];
+    if (room) {
+      const otherPeer = room.find((peer) => peer !== socket.id);
+      if (otherPeer) {
+        socket.to(otherPeer).emit("offer", offer);
+      }
+    }
+  });
+
+  // RTC - Answer
+  socket.on("answer", (answer) => {
+    const user = listOfUsers[socket.id];
+    const room = listOfRooms[user.currentRoom];
+    if (room) {
+      const otherPeer = room.find((peer) => peer !== socket.id);
+      if (otherPeer) {
+        socket.to(otherPeer).emit("answer", answer);
+      }
+    }
+  });
+
+  // ICE Candidates Handler
+  socket.on("ice-candidate", (candidate) => {
+    const user = listOfUsers[socket.id];
+    const room = listOfRooms[user.currentRoom];
+    if (room) {
+      const otherPeer = room.find((peer) => peer !== socket.id);
+      if (otherPeer) {
+        socket.to(otherPeer).emit("ice-candidate", candidate);
       }
     }
   });

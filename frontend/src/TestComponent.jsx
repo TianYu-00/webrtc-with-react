@@ -10,24 +10,66 @@ export default function PlayGround() {
   const [me, setMe] = useState("");
   const [name, setName] = useState("");
   const [roomId, setRoomId] = useState("");
-  const [roomFull, setRoomFull] = useState(false);
   const myVideo = useRef();
+  const remoteVideo = useRef();
+  const peerConnection = useRef(null);
 
   useEffect(() => {
-    // getUserMedia - Get user permission to use their camera and audio and then assign the camera video to a video reference
     navigator.mediaDevices
       .getUserMedia({ video: true, audio: true })
       .then((currentStream) => {
         setStream(currentStream);
         myVideo.current.srcObject = currentStream;
+
+        // RTCPeerConnection
+        peerConnection.current = new RTCPeerConnection({
+          iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+        });
+
+        // Add local tracks to the peer connection
+        currentStream.getTracks().forEach((track) => {
+          peerConnection.current.addTrack(track, currentStream);
+        });
+
+        // Handle incoming tracks
+        peerConnection.current.ontrack = (event) => {
+          remoteVideo.current.srcObject = event.streams[0];
+        };
+
+        // Handle ICE candidates
+        peerConnection.current.onicecandidate = (event) => {
+          if (event.candidate) {
+            socket.emit("ice-candidate", event.candidate);
+          }
+        };
       })
       .catch((error) => {
         console.log("Camera/Audio Rejected!", error);
       });
 
-    // set local user id
     socket.on("me", (id) => {
       setMe(id);
+    });
+
+    socket.on("offer", async (offer) => {
+      if (peerConnection.current) {
+        await peerConnection.current.setRemoteDescription(new RTCSessionDescription(offer));
+        const answer = await peerConnection.current.createAnswer();
+        await peerConnection.current.setLocalDescription(answer);
+        socket.emit("answer", answer);
+      }
+    });
+
+    socket.on("answer", async (answer) => {
+      if (peerConnection.current) {
+        await peerConnection.current.setRemoteDescription(new RTCSessionDescription(answer));
+      }
+    });
+
+    socket.on("ice-candidate", (candidate) => {
+      if (peerConnection.current) {
+        peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
+      }
     });
 
     const newName = GenerateName();
@@ -52,6 +94,13 @@ export default function PlayGround() {
     socket.emit("join-room", roomId, (response) => {
       if (response.success) {
         console.log(`Joined room: ${roomId}`);
+        // Create an offer to send to the other peer
+        peerConnection.current
+          .createOffer()
+          .then((offer) => peerConnection.current.setLocalDescription(offer))
+          .then(() => {
+            socket.emit("offer", peerConnection.current.localDescription);
+          });
       } else {
         console.log(`Failed to join room: ${response.message}`);
       }
@@ -61,6 +110,10 @@ export default function PlayGround() {
   const leaveRoom = () => {
     socket.emit("leave-room", roomId);
     setRoomId("");
+    if (peerConnection.current) {
+      peerConnection.current.close();
+      peerConnection.current = null;
+    }
   };
 
   const copyRoomId = () => {
@@ -92,6 +145,9 @@ export default function PlayGround() {
       </button>
       <div className="max-w-md bg-gray-800 flex items-center justify-center">
         <video playsInline muted ref={myVideo} autoPlay className="aspect-video object-cover" />
+      </div>
+      <div className="max-w-md bg-gray-800 flex items-center justify-center">
+        <video playsInline ref={remoteVideo} autoPlay className="aspect-video object-cover" />
       </div>
       <div>
         <p>Users In Room:</p>
