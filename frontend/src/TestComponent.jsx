@@ -10,10 +10,10 @@ export default function PlayGround() {
   const [me, setMe] = useState("");
   const [name, setName] = useState("");
   const [roomId, setRoomId] = useState("");
-  const [peers, setPeers] = useState({});
   const myVideo = useRef();
-
-  useEffect(() => {}, []);
+  const remoteVideo = useRef();
+  const peerConnection = useRef(null);
+  const [refreshCounter, setRefreshCounter] = useState(0);
 
   useEffect(() => {
     navigator.mediaDevices
@@ -21,6 +21,35 @@ export default function PlayGround() {
       .then((currentStream) => {
         setStream(currentStream);
         myVideo.current.srcObject = currentStream;
+
+        // RTCPeerConnection
+        peerConnection.current = new RTCPeerConnection({
+          iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+        });
+
+        // Add local tracks to the peer connection
+        currentStream.getTracks().forEach((track) => {
+          peerConnection.current.addTrack(track, currentStream);
+        });
+
+        // Handle incoming tracks
+        peerConnection.current.ontrack = (event) => {
+          if (event.streams[0]) {
+            if (remoteVideo.current.srcObject) {
+              remoteVideo.current.srcObject = null;
+            }
+            remoteVideo.current.srcObject = event.streams[0];
+          } else {
+            remoteVideo.current.srcObject = null;
+          }
+        };
+
+        // Handle ICE candidates
+        peerConnection.current.onicecandidate = (event) => {
+          if (event.candidate) {
+            socket.emit("ice-candidate", event.candidate);
+          }
+        };
       })
       .catch((error) => {
         console.log("Camera/Audio Rejected!", error);
@@ -30,60 +59,112 @@ export default function PlayGround() {
       setMe(id);
     });
 
+    socket.on("offer", async (offer) => {
+      if (peerConnection.current) {
+        await peerConnection.current.setRemoteDescription(new RTCSessionDescription(offer));
+        const answer = await peerConnection.current.createAnswer();
+        await peerConnection.current.setLocalDescription(answer);
+        socket.emit("answer", answer);
+      }
+    });
+
+    socket.on("answer", async (answer) => {
+      if (peerConnection.current) {
+        await peerConnection.current.setRemoteDescription(new RTCSessionDescription(answer));
+      }
+    });
+
+    socket.on("ice-candidate", (candidate) => {
+      if (peerConnection.current) {
+        peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
+      }
+    });
+
+    socket.on("peer-left", (peerId) => {
+      console.log(`Peer ${peerId} left the room`);
+
+      if (peerId === me) {
+        if (peerConnection.current) {
+          peerConnection.current.close();
+          peerConnection.current = null;
+          remoteVideo.current.srcObject = null;
+        }
+      } else {
+        if (remoteVideo.current.srcObject) {
+          remoteVideo.current.srcObject = null;
+        }
+      }
+    });
+
     const newName = GenerateName();
     setName(newName);
-    socket.emit("set-name", newName);
 
-    socket.on("user-joined", ({ userId, userName }) => {
-      console.log(`${userId} joined the room with username of ${userName}`);
-      setPeers((prevPeers) => ({
-        ...prevPeers,
-        [userId]: userName,
-      }));
-    });
-
-    socket.on("user-left", ({ userId }) => {
-      setPeers((prevPeers) => {
-        const newPeers = { ...prevPeers };
-        delete newPeers[userId];
-        return newPeers;
-      });
-    });
-
-    socket.on("all-users", (users) => {
-      const newPeers = users.reduce((acc, { userId, userName }) => {
-        acc[userId] = userName;
-        return acc;
-      }, {});
-      setPeers(newPeers);
-    });
-
+    // clean ups
     return () => {
-      socket.off("user-joined");
-      socket.off("user-left");
-      socket.off("all-users");
+      socket.off("peer-left");
     };
-  }, [peers, roomId]);
+  }, [refreshCounter]);
+
+  useEffect(() => {
+    socket.on("room-closed", (roomId) => {
+      if (roomId === roomId) {
+        alert("The room has been closed by the host.");
+        leaveRoom();
+      }
+    });
+
+    // clean ups
+    return () => {
+      socket.off("room-closed");
+    };
+  }, [roomId]);
+
+  useEffect(() => {
+    if (me && name) {
+      socket.emit("add-user", { socketID: me, localName: name });
+    }
+  }, [me, name]);
 
   const createRoom = () => {
-    const newRoomId = uuidv4();
-    setRoomId(newRoomId);
-    socket.emit("join-room", newRoomId);
+    socket.emit("create-room", (newRoomID) => {
+      setRoomId(newRoomID);
+      console.log(`Room created with ID: ${newRoomID}`);
+      navigator.clipboard.writeText(newRoomID);
+    });
   };
 
   const joinRoom = () => {
-    if (roomId) {
-      socket.emit("join-room", roomId);
-    }
+    socket.emit("join-room", roomId, (response) => {
+      if (response.success) {
+        console.log(`Joined room: ${roomId}`);
+        // Create an offer to send to the other peer
+        peerConnection.current
+          .createOffer()
+          .then((offer) => peerConnection.current.setLocalDescription(offer))
+          .then(() => {
+            socket.emit("offer", peerConnection.current.localDescription);
+          });
+      } else {
+        console.log(`Failed to join room: ${response.message}`);
+      }
+    });
   };
 
   const leaveRoom = () => {
-    if (roomId) {
-      socket.emit("leave-room", roomId);
-      setRoomId("");
-      setPeers({});
-      setStream(null);
+    socket.emit("leave-room", roomId);
+    setRoomId("");
+    if (peerConnection.current) {
+      peerConnection.current.close();
+      peerConnection.current = null;
     }
+    if (remoteVideo.current) {
+      remoteVideo.current.srcObject = null;
+    }
+    setRefreshCounter(refreshCounter + 1);
+  };
+
+  const copyRoomId = () => {
+    navigator.clipboard.writeText(roomId);
   };
 
   return (
@@ -97,6 +178,9 @@ export default function PlayGround() {
         onChange={(e) => setRoomId(e.target.value)}
         className="mb-4"
       />
+      <button onClick={copyRoomId} className="mb-4 bg-orange-500 text-white p-2">
+        Copy Room ID
+      </button>
       <button onClick={createRoom} className="mb-4 bg-green-500 text-white p-2">
         Create Room
       </button>
@@ -109,11 +193,11 @@ export default function PlayGround() {
       <div className="max-w-md bg-gray-800 flex items-center justify-center">
         <video playsInline muted ref={myVideo} autoPlay className="aspect-video object-cover" />
       </div>
+      <div className="max-w-md bg-gray-800 flex items-center justify-center">
+        <video playsInline ref={remoteVideo} autoPlay className="aspect-video object-cover" />
+      </div>
       <div>
         <p>Users In Room:</p>
-        {Object.entries(peers).map(([userId, userName]) => (
-          <p key={userId}>{userName}</p>
-        ))}
       </div>
     </div>
   );
