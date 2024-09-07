@@ -106,6 +106,20 @@ export default function PlayGround() {
   }, [refreshCounter]);
 
   useEffect(() => {
+    socket.on("room-closed", (roomId) => {
+      if (roomId === roomId) {
+        alert("The room has been closed by the host.");
+        leaveRoom();
+      }
+    });
+
+    // clean ups
+    return () => {
+      socket.off("room-closed");
+    };
+  }, [roomId]);
+
+  useEffect(() => {
     if (me && name) {
       socket.emit("add-user", { socketID: me, localName: name });
     }

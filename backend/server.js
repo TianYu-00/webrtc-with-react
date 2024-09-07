@@ -22,7 +22,6 @@ app.get("/", (req, res) => {
   res.send("Server is currently running");
 });
 
-// backend socket io connections
 io.on("connection", (socket) => {
   console.log(socket.id, "connected to socket");
 
@@ -42,8 +41,8 @@ io.on("connection", (socket) => {
       socket.leave(user.currentRoom);
       const oldRoom = listOfRooms[user.currentRoom];
       if (oldRoom) {
-        oldRoom.splice(oldRoom.indexOf(socket.id), 1);
-        if (oldRoom.length === 0) {
+        oldRoom.members = oldRoom.members.filter((id) => id !== socket.id);
+        if (oldRoom.members.length === 0) {
           delete listOfRooms[user.currentRoom];
           console.log(`Room ${user.currentRoom} deleted`);
         }
@@ -53,7 +52,10 @@ io.on("connection", (socket) => {
 
     // create room
     const roomId = uuidv4();
-    listOfRooms[roomId] = [socket.id];
+    listOfRooms[roomId] = {
+      members: [socket.id],
+      host: socket.id,
+    };
     user.currentRoom = roomId;
     socket.join(roomId);
     console.log(`${socket.id} created and joined room ${roomId}`);
@@ -66,19 +68,19 @@ io.on("connection", (socket) => {
     const user = listOfUsers[socket.id];
 
     if (room) {
-      if (room.includes(socket.id)) {
+      if (room.members.includes(socket.id)) {
         console.log(`${socket.id} is already in room ${roomId}`);
         callback({ success: false, message: "Already in room" });
         return;
       }
 
-      if (room.length < 2) {
+      if (room.members.length < 2) {
         if (user.currentRoom) {
           socket.leave(user.currentRoom);
           const oldRoom = listOfRooms[user.currentRoom];
           if (oldRoom) {
-            oldRoom.splice(oldRoom.indexOf(socket.id), 1);
-            if (oldRoom.length === 0) {
+            oldRoom.members = oldRoom.members.filter((id) => id !== socket.id);
+            if (oldRoom.members.length === 0) {
               delete listOfRooms[user.currentRoom];
               console.log(`Room ${user.currentRoom} deleted`);
             }
@@ -86,7 +88,7 @@ io.on("connection", (socket) => {
           console.log(`${socket.id} left room ${user.currentRoom}`);
         }
 
-        room.push(socket.id);
+        room.members.push(socket.id);
         user.currentRoom = roomId;
         socket.join(roomId);
         console.log(`${socket.id} joined room ${roomId}`);
@@ -107,16 +109,20 @@ io.on("connection", (socket) => {
     const user = listOfUsers[socket.id];
 
     if (room && user.currentRoom === roomId) {
-      const index = room.indexOf(socket.id);
+      const index = room.members.indexOf(socket.id);
       if (index !== -1) {
-        room.splice(index, 1);
+        room.members.splice(index, 1);
         socket.leave(roomId);
         console.log(`${socket.id} left room ${roomId}`);
-        if (room.length === 0) {
+        console.log(listOfRooms);
+        if (room.members.length === 0 || socket.id === room.host) {
+          room.members.forEach((peer) => {
+            socket.to(peer).emit("room-closed", roomId);
+          });
           delete listOfRooms[roomId];
           console.log(`Room ${roomId} deleted`);
         } else {
-          room.forEach((peer) => {
+          room.members.forEach((peer) => {
             socket.to(peer).emit("peer-left", socket.id);
           });
           socket.emit("peer-left", socket.id);
@@ -131,7 +137,7 @@ io.on("connection", (socket) => {
     const user = listOfUsers[socket.id];
     const room = listOfRooms[user.currentRoom];
     if (room) {
-      const otherPeer = room.find((peer) => peer !== socket.id);
+      const otherPeer = room.members.find((peer) => peer !== socket.id);
       if (otherPeer) {
         socket.to(otherPeer).emit("offer", offer);
       }
@@ -143,7 +149,7 @@ io.on("connection", (socket) => {
     const user = listOfUsers[socket.id];
     const room = listOfRooms[user.currentRoom];
     if (room) {
-      const otherPeer = room.find((peer) => peer !== socket.id);
+      const otherPeer = room.members.find((peer) => peer !== socket.id);
       if (otherPeer) {
         socket.to(otherPeer).emit("answer", answer);
       }
@@ -155,7 +161,7 @@ io.on("connection", (socket) => {
     const user = listOfUsers[socket.id];
     const room = listOfRooms[user.currentRoom];
     if (room) {
-      const otherPeer = room.find((peer) => peer !== socket.id);
+      const otherPeer = room.members.find((peer) => peer !== socket.id);
       if (otherPeer) {
         socket.to(otherPeer).emit("ice-candidate", candidate);
       }
@@ -172,11 +178,11 @@ io.on("connection", (socket) => {
     // handle on disconnect room removal
     for (const roomId in listOfRooms) {
       const room = listOfRooms[roomId];
-      const index = room.indexOf(socket.id);
+      const index = room.members.indexOf(socket.id);
       if (index !== -1) {
-        room.splice(index, 1);
+        room.members.splice(index, 1);
         console.log(`${socket.id} removed from room ${roomId}`);
-        if (room.length === 0) {
+        if (room.members.length === 0) {
           delete listOfRooms[roomId]; // remove room when room is empty
           console.log(`Room ${roomId} deleted`);
         }
