@@ -44,6 +44,7 @@ export default function PlayGround() {
     socket.emit("create-room", (newRoomID) => {
       setRoomId(newRoomID);
       console.log(`Room created with ID: ${newRoomID}`);
+      navigator.clipboard.writeText(newRoomID);
     });
   };
 
@@ -59,7 +60,7 @@ export default function PlayGround() {
 
   const leaveRoom = () => {
     socket.emit("leave-room", roomId);
-    setRoomId(""); // Clear the room ID on leave
+    setRoomId("");
   };
 
   const copyRoomId = () => {
