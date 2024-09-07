@@ -115,6 +115,11 @@ io.on("connection", (socket) => {
         if (room.length === 0) {
           delete listOfRooms[roomId];
           console.log(`Room ${roomId} deleted`);
+        } else {
+          room.forEach((peer) => {
+            socket.to(peer).emit("peer-left", socket.id);
+          });
+          socket.emit("peer-left", socket.id);
         }
         user.currentRoom = null;
       }

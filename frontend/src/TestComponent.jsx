@@ -33,7 +33,14 @@ export default function PlayGround() {
 
         // Handle incoming tracks
         peerConnection.current.ontrack = (event) => {
-          remoteVideo.current.srcObject = event.streams[0];
+          if (event.streams[0]) {
+            if (remoteVideo.current.srcObject) {
+              remoteVideo.current.srcObject = null;
+            }
+            remoteVideo.current.srcObject = event.streams[0];
+          } else {
+            remoteVideo.current.srcObject = null;
+          }
         };
 
         // Handle ICE candidates
@@ -72,8 +79,29 @@ export default function PlayGround() {
       }
     });
 
+    socket.on("peer-left", (peerId) => {
+      console.log(`Peer ${peerId} left the room`);
+
+      if (peerId === me) {
+        if (peerConnection.current) {
+          peerConnection.current.close();
+          peerConnection.current = null;
+          remoteVideo.current.srcObject = null;
+        }
+      } else {
+        if (remoteVideo.current.srcObject) {
+          remoteVideo.current.srcObject = null;
+        }
+      }
+    });
+
     const newName = GenerateName();
     setName(newName);
+
+    // clean ups
+    return () => {
+      socket.off("peer-left");
+    };
   }, []);
 
   useEffect(() => {
