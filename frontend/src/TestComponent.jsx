@@ -13,6 +13,7 @@ export default function PlayGround() {
   const myVideo = useRef();
   const remoteVideo = useRef();
   const peerConnection = useRef(null);
+  const [refreshCounter, setRefreshCounter] = useState(0);
 
   useEffect(() => {
     navigator.mediaDevices
@@ -102,7 +103,7 @@ export default function PlayGround() {
     return () => {
       socket.off("peer-left");
     };
-  }, []);
+  }, [refreshCounter]);
 
   useEffect(() => {
     if (me && name) {
@@ -142,6 +143,10 @@ export default function PlayGround() {
       peerConnection.current.close();
       peerConnection.current = null;
     }
+    if (remoteVideo.current) {
+      remoteVideo.current.srcObject = null;
+    }
+    setRefreshCounter(refreshCounter + 1);
   };
 
   const copyRoomId = () => {
