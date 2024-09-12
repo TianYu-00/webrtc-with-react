@@ -9,3 +9,4 @@
 - Tailwind
 - WebRTC
 - Socket.IO-Client
+- React-Icons
