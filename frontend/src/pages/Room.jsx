@@ -1,15 +1,29 @@
 import React, { useEffect, useState, useRef } from "react";
 import { BsCameraVideoFill, BsCameraVideoOffFill, BsMicFill, BsMicMuteFill, BsTelephoneXFill } from "react-icons/bs";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation, useParams } from "react-router-dom";
 
 export default function Room({ socket }) {
   const navigate = useNavigate();
+  let location = useLocation();
+
+  // Room info
+  const { roomID } = useParams();
+
+  // my info
   const [stream, setStream] = useState(null);
   const myVideo = useRef();
-
-  // cam/mic on/off
   const [isVideoOn, setIsVideoOn] = useState(false);
   const [isMicOn, setIsMicOn] = useState(false);
+  const [myName, setMyName] = useState("");
+
+  // peer info
+  const peerVideo = useRef();
+  const [peerName, setPeerName] = useState("");
+
+  useEffect(() => {
+    const myAssignedName = location.state.name;
+    setMyName(myAssignedName);
+  }, []);
 
   useEffect(() => {
     navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then((currentStream) => {
@@ -35,15 +49,24 @@ export default function Room({ socket }) {
     <div className="flex flex-col h-screen">
       {/* Video */}
       <div className="flex flex-grow overflow-hidden">
-        {/* Video */}
         <div className="flex flex-col flex-grow p-2">
           <div className="flex flex-col flex-grow items-center justify-center space-y-2 overflow-hidden">
-            <div className="w-full h-1/2 border border-gray-700 bg-black flex justify-center items-center">
+            {/* My Video */}
+            <div className="w-full h-1/2 border border-gray-700 bg-black flex justify-center items-center relative">
               <video className="h-full " autoPlay muted ref={myVideo}></video>
+              <div className="absolute bottom-0 left-2">
+                <p>{myName}</p>
+              </div>
+              <div className="absolute bottom-0 right-2">
+                <p>{roomID}</p>
+              </div>
             </div>
-
-            <div className="w-full h-1/2 border border-gray-700 bg-black flex justify-center items-center">
-              <video className="h-full " autoPlay muted></video>
+            {/* Peer Video */}
+            <div className="w-full h-1/2 border border-gray-700 bg-black flex justify-center items-center relative">
+              <video className="h-full " autoPlay muted ref={peerVideo}></video>
+              <div className="absolute bottom-0 left-2">
+                <p>{peerName}</p>
+              </div>
             </div>
           </div>
         </div>

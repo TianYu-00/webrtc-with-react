@@ -31,8 +31,8 @@ const App = () => {
     <BrowserRouter>
       <SocketInfo socket={socket} />
       <Routes>
-        <Route path="/" element={<Home socket={socket} />} />
-        <Route path="/room/:roomId" element={<Room socket={socket} />} />
+        <Route path="/" element={<Home />} />
+        <Route path="/room/:roomID" element={<Room socket={socket} />} />
         {/* <Route path="/playground" element={<PlayGround />} /> */}
       </Routes>
     </BrowserRouter>

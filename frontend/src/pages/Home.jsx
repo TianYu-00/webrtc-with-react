@@ -3,7 +3,7 @@ import { uniqueNamesGenerator, adjectives, colors, animals } from "unique-names-
 import { v4 as uuidv4 } from "uuid";
 import { useNavigate } from "react-router-dom";
 
-export default function Home({ socket }) {
+export default function Home() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [roomID, setRoomID] = useState("");
