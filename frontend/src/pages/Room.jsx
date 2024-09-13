@@ -1,11 +1,8 @@
 import React, { useEffect, useState, useRef } from "react";
 import { BsCameraVideoFill, BsCameraVideoOffFill, BsMicFill, BsMicMuteFill, BsTelephoneXFill } from "react-icons/bs";
-import io from "socket.io-client";
 import { useNavigate } from "react-router-dom";
 
-const socket = io("http://localhost:5000");
-
-export default function Room() {
+export default function Room({ socket }) {
   const navigate = useNavigate();
   const [stream, setStream] = useState(null);
   const myVideo = useRef();
