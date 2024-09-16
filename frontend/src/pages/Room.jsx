@@ -9,7 +9,7 @@ import {
 } from "react-icons/bs";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 
-export default function Room({ socket }) {
+export default function Room({ socket, mySocketID }) {
   const navigate = useNavigate();
   let location = useLocation();
 
@@ -109,6 +109,9 @@ export default function Room({ socket }) {
               setSelectedCamera={setSelectedCamera}
               setSelectedAudioInput={setSelectedAudioInput}
               setSelectedAudioOutput={setSelectedAudioOutput}
+              roomID={roomID}
+              myName={myName}
+              mySocketID={mySocketID}
             />
           </div>
         </div>
@@ -188,7 +191,15 @@ export default function Room({ socket }) {
   );
 }
 
-function SettingsModal({ isSettingHidden, setSelectedCamera, setSelectedAudioInput, setSelectedAudioOutput }) {
+function SettingsModal({
+  isSettingHidden,
+  setSelectedCamera,
+  setSelectedAudioInput,
+  setSelectedAudioOutput,
+  roomID,
+  myName,
+  mySocketID,
+}) {
   const [cameraDevices, setCameraDevices] = useState([]);
   const [audioInputDevices, setAudioInputDevices] = useState([]);
   const [audioOutputDevices, setAudioOutputDevices] = useState([]);
@@ -258,6 +269,13 @@ function SettingsModal({ isSettingHidden, setSelectedCamera, setSelectedAudioInp
             </option>
           ))}
         </select>
+      </div>
+
+      <div className="text-left">
+        <p className="border-b mt-2">Room Info</p>
+        <p>Room ID: {roomID}</p>
+        <p>Local Name: {myName}</p>
+        <p>Local Socket ID: {mySocketID}</p>
       </div>
     </div>
   );

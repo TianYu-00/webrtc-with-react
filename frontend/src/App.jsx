@@ -8,8 +8,15 @@ import { socket } from "./socket";
 
 const App = () => {
   const [isConnected, setIsConnected] = useState(socket.connected);
+  const [mySocketID, setMySocketID] = useState(null);
 
   useEffect(() => {
+    const handleSocketID = (id) => {
+      setMySocketID(id);
+    };
+
+    socket.on("me", handleSocketID);
+
     function onConnect() {
       setIsConnected(true);
     }
@@ -32,7 +39,7 @@ const App = () => {
       <SocketInfo socket={socket} />
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/room/:roomID" element={<Room socket={socket} />} />
+        <Route path="/room/:roomID" element={<Room socket={socket} mySocketID={mySocketID} />} />
         {/* <Route path="/playground" element={<PlayGround />} /> */}
       </Routes>
     </BrowserRouter>

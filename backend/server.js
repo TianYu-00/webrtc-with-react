@@ -33,6 +33,8 @@ io.on("connection", (socket) => {
     console.log(listOfUsers);
   });
 
+  // Room handler
+
   // Disconnect Handler
   socket.on("disconnect", () => {
     console.log(socket.id, "disconnected");
