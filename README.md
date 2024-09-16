@@ -3,6 +3,7 @@
 ## Backend
 - Express
 - Socket.IO
+- Cors
 
 ## Frontend
 - React (Vite)
