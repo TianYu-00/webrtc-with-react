@@ -129,7 +129,7 @@ export default function Room({ socket }) {
           </button>
         ) : (
           <button
-            className="flex flex-col w-16 h-full justify-center items-center text-white"
+            className="flex flex-col w-16 h-full justify-center items-center text-red-500"
             onClick={() => {
               Handle_Cam();
             }}
@@ -152,7 +152,7 @@ export default function Room({ socket }) {
           </button>
         ) : (
           <button
-            className="flex flex-col w-16 h-full justify-center items-center text-white"
+            className="flex flex-col w-16 h-full justify-center items-center text-red-500"
             onClick={() => {
               Handle_Mic();
             }}
