@@ -1,5 +1,5 @@
+// my server.js file
 const express = require("express");
-const { v4: uuidv4 } = require("uuid");
 const app = express();
 const server = require("http").createServer(app);
 const cors = require("cors");
@@ -15,6 +15,7 @@ app.use(cors());
 
 const serverPort = process.env.PORT || 5000;
 
+let connectedCounter = 0;
 const listOfUsers = {};
 const listOfRooms = {};
 
@@ -23,21 +24,38 @@ app.get("/", (req, res) => {
 });
 
 io.on("connection", (socket) => {
-  console.log(socket.id, "connected");
+  connectedCounter++;
+  console.log(connectedCounter, "users online");
 
   socket.emit("me", socket.id);
 
+  io.emit("all-users-connected", connectedCounter);
+
   // Name Handler
-  socket.on("add-user", ({ socketID, localName }) => {
-    listOfUsers[socketID] = { name: localName, currentRoom: null };
+  socket.on("add-user", ({ socketID, localName, roomID }) => {
+    listOfUsers[socketID] = { name: localName, currentRoom: roomID };
     console.log(listOfUsers);
   });
 
   // Room handler
 
+  // create room
+
+  // join room
+
+  // leave room
+
+  // offer
+
+  // answer
+
+  // ice-candidate
+
   // Disconnect Handler
   socket.on("disconnect", () => {
+    connectedCounter--;
     console.log(socket.id, "disconnected");
+    io.emit("all-users-connected", connectedCounter);
     delete listOfUsers[socket.id];
   });
 });

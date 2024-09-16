@@ -4,17 +4,25 @@ export default function SocketInfo({ socket }) {
   const [isHidden, setIsHidden] = useState(false);
   // Sockets Related
   const [mySocketID, setMySocketID] = useState("");
+  const [connectedUsers, setConnectedUsers] = useState(0);
   useEffect(() => {
     const handleSocketID = (id) => {
       setMySocketID(id);
     };
 
+    const handleAllUsersConnected = (connectedCounter) => {
+      setConnectedUsers(connectedCounter);
+    };
+
     socket.on("me", handleSocketID);
+
+    socket.on("all-users-connected", handleAllUsersConnected);
 
     return () => {
       socket.off("me", handleSocketID);
+      socket.off("all-users-connected", handleAllUsersConnected);
     };
-  }, []);
+  }, [socket]);
 
   function handleHidden() {
     setIsHidden(!isHidden);
@@ -45,6 +53,7 @@ export default function SocketInfo({ socket }) {
           </button>
           <p>Socket Info</p>
           <p>ID: {mySocketID}</p>
+          <p>Connected: {connectedUsers}</p>
         </div>
       )}
     </div>

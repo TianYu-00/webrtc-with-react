@@ -58,6 +58,13 @@ export default function Room({ socket, mySocketID }) {
     getMediaStream();
   }, [selectedCamera, selectedAudioInput]);
 
+  // add-user
+  useEffect(() => {
+    if (roomID && myName && mySocketID) {
+      socket.emit("add-user", { socketID: mySocketID, localName: myName, roomID: roomID });
+    }
+  }, [mySocketID, myName, roomID]);
+
   function LeaveRoom() {
     navigate(`/`);
     return;
