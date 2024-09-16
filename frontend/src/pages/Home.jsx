@@ -20,12 +20,12 @@ export default function Home() {
     if (inputName === "") {
       // generate random name
       const newName = GenerateName();
-      console.log(newName); // test feedback
+      console.log(newName);
       setName(newName);
       return;
     }
     setName(inputName);
-    console.log("Name Changed"); // test feedback
+    console.log("Name Changed");
   }
 
   function JoinRoom() {
@@ -34,7 +34,7 @@ export default function Home() {
       return;
     }
     setRoomID(inputRoomID);
-    console.log("Join Room"); // test feedback
+    console.log("Join Room");
     navigate(`/room/${inputRoomID}`, { state: { name } });
   }
 
@@ -43,6 +43,7 @@ export default function Home() {
     navigate(`/room/${newRoomID}`, { state: { name } });
     return;
   }
+
   return (
     <div className="flex justify-center items-center min-h-screen">
       <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm w-full">
