@@ -3,7 +3,7 @@ import { uniqueNamesGenerator, adjectives, colors, animals } from "unique-names-
 import { v4 as uuidv4 } from "uuid";
 import { useNavigate } from "react-router-dom";
 
-export default function Home() {
+export default function Home({ socket, mySocketID }) {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [roomID, setRoomID] = useState("");
@@ -29,17 +29,26 @@ export default function Home() {
   }
 
   function JoinRoom() {
-    if (roomID === "") {
+    if (inputRoomID === "") {
       console.log("Room ID Empty");
       return;
     }
     setRoomID(inputRoomID);
-    console.log("Join Room");
     navigate(`/room/${inputRoomID}`, { state: { name } });
   }
 
   function CreateRoom() {
+    if (!name || !mySocketID) {
+      console.log("Name or Socket ID is missing");
+      return;
+    }
+
     const newRoomID = uuidv4();
+
+    socket.emit("add-user", { socketID: mySocketID, localName: name, roomID: newRoomID });
+
+    socket.emit("create-room", { roomID: newRoomID });
+
     navigate(`/room/${newRoomID}`, { state: { name } });
     return;
   }

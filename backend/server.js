@@ -16,7 +16,7 @@ app.use(cors());
 const serverPort = process.env.PORT || 5000;
 
 let connectedCounter = 0;
-const listOfUsers = {};
+const listOfUsersInRoom = {};
 const listOfRooms = {};
 
 app.get("/", (req, res) => {
@@ -33,17 +33,31 @@ io.on("connection", (socket) => {
 
   // Name Handler
   socket.on("add-user", ({ socketID, localName, roomID }) => {
-    listOfUsers[socketID] = { name: localName, currentRoom: roomID };
-    console.log(listOfUsers);
+    listOfUsersInRoom[socketID] = { name: localName, currentRoom: roomID };
+    // console.log(listOfUsersInRoom);
   });
 
   // Room handler
 
   // create room
+  socket.on("create-room", ({ roomID }) => {
+    if (listOfUsersInRoom[socket.id]) {
+      listOfRooms[roomID] = {
+        socketIDHost: socket.id,
+        socketIDPeer: undefined,
+      };
+      socket.join(roomID);
+      console.log("list of rooms:", listOfRooms);
+    } else {
+      console.log("User not found");
+    }
+  });
 
   // join room
+  socket.on("join-room", ({ roomID }) => {});
 
   // leave room
+  socket.on("leave-room", ({ roomID }) => {});
 
   // offer
 
@@ -54,9 +68,9 @@ io.on("connection", (socket) => {
   // Disconnect Handler
   socket.on("disconnect", () => {
     connectedCounter--;
-    console.log(socket.id, "disconnected");
+    console.log(connectedCounter, "users online");
     io.emit("all-users-connected", connectedCounter);
-    delete listOfUsers[socket.id];
+    delete listOfUsersInRoom[socket.id];
   });
 });
 
@@ -76,3 +90,17 @@ server.listen(serverPort, () => {
 
 // More info on media devices
 // https://webrtc.org/getting-started/media-devices#using-asyncawait_1
+
+// list of users
+/*
+  {
+    socketID: {name:user-name, currentRoom: roomID}
+  }
+*/
+
+// list of rooms
+/*
+  {
+    roomID: {socketIDHost:hostSocketID, socketIDPeer:peerSocketID}
+  }
+*/
