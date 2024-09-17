@@ -57,7 +57,20 @@ io.on("connection", (socket) => {
   socket.on("join-room", ({ roomID }) => {});
 
   // leave room
-  socket.on("leave-room", ({ roomID }) => {});
+  socket.on("leave-room", ({ roomID }) => {
+    if (socket.id === listOfRooms[roomID].socketIDHost) {
+      delete listOfRooms[roomID];
+      console.log("Host left the room");
+      // ok so i would need to add some more logic here to handle host leaving
+      // maybe like close the room down or whatever.
+    } else if (socket.id === listOfRooms[roomID].socketIDPeer) {
+      // need to alert host that peer has left
+
+      // handle it locally
+      listOfRooms[roomID].socketIDPeer = undefined;
+      delete listOfUsersInRoom[socket.id];
+    }
+  });
 
   // offer
 
@@ -87,6 +100,8 @@ server.listen(serverPort, () => {
 
 // More info on Socket.io
 // https://socket.io/how-to/use-with-react
+// https://socket.io/docs/v3/emit-cheatsheet/
+// https://socket.io/docs/v4/rooms/
 
 // More info on media devices
 // https://webrtc.org/getting-started/media-devices#using-asyncawait_1

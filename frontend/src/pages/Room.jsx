@@ -59,6 +59,7 @@ export default function Room({ socket, mySocketID }) {
   }, [selectedCamera, selectedAudioInput]);
 
   function LeaveRoom() {
+    socket.emit("leave-room", { roomID: roomID });
     navigate(`/`);
     return;
   }
