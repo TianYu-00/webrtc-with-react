@@ -5,6 +5,8 @@ export default function SocketInfo({ socket }) {
   // Sockets Related
   const [mySocketID, setMySocketID] = useState("");
   const [connectedUsers, setConnectedUsers] = useState(0);
+  const [allUsersInRoom, setAllUsersInRoom] = useState({});
+  const [allRooms, setAllRooms] = useState({});
   useEffect(() => {
     const handleSocketID = (id) => {
       setMySocketID(id);
@@ -18,9 +20,19 @@ export default function SocketInfo({ socket }) {
 
     socket.on("all-users-connected", handleAllUsersConnected);
 
+    socket.on("all-rooms", (data) => {
+      setAllRooms(data);
+    });
+
+    socket.on("all-users", (data) => {
+      setAllUsersInRoom(data);
+    });
+
     return () => {
       socket.off("me", handleSocketID);
       socket.off("all-users-connected", handleAllUsersConnected);
+      socket.off("all-users");
+      socket.off("all-rooms");
     };
   }, [socket]);
 
@@ -54,6 +66,13 @@ export default function SocketInfo({ socket }) {
           <p>Socket Info</p>
           <p>ID: {mySocketID}</p>
           <p>Connected: {connectedUsers}</p>
+          <div>
+            <p>All Users In Room:</p>
+            <pre>{JSON.stringify(allUsersInRoom, null, 2)}</pre>
+
+            <p>All Rooms:</p>
+            <pre>{JSON.stringify(allRooms, null, 2)}</pre>
+          </div>
         </div>
       )}
     </div>

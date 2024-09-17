@@ -58,10 +58,20 @@ export default function Room({ socket, mySocketID }) {
     getMediaStream();
   }, [selectedCamera, selectedAudioInput]);
 
+  useEffect(() => {
+    socket.on("force-leave-room", (data) => {
+      console.log(data.message);
+      navigate(`/`);
+    });
+
+    return () => {
+      socket.off("force-leave-room");
+    };
+  }, []);
+
   function LeaveRoom() {
     socket.emit("leave-room", { roomID: roomID });
     navigate(`/`);
-    return;
   }
 
   function Handle_Cam() {

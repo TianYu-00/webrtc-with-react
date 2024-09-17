@@ -30,11 +30,13 @@ io.on("connection", (socket) => {
   socket.emit("me", socket.id);
 
   io.emit("all-users-connected", connectedCounter);
+  io.emit("all-rooms", listOfRooms);
+  io.emit("all-users", listOfUsersInRoom);
 
   // Name Handler
   socket.on("add-user", ({ socketID, localName, roomID }) => {
     listOfUsersInRoom[socketID] = { name: localName, currentRoom: roomID };
-    // console.log(listOfUsersInRoom);
+    io.emit("all-users", listOfUsersInRoom);
   });
 
   // Room handler
@@ -47,7 +49,7 @@ io.on("connection", (socket) => {
         socketIDPeer: undefined,
       };
       socket.join(roomID);
-      console.log("list of rooms:", listOfRooms);
+      io.emit("all-rooms", listOfRooms);
     } else {
       console.log("User not found");
     }
@@ -55,19 +57,17 @@ io.on("connection", (socket) => {
 
   // join room
   socket.on("join-room", ({ roomID }) => {
-    console.log(roomID);
     if (listOfRooms.hasOwnProperty(roomID)) {
       if (listOfRooms[roomID].socketIDPeer === undefined) {
         listOfRooms[roomID].socketIDPeer = socket.id;
         socket.join(roomID);
         socket.emit("room-joined", { success: true, message: "Joined room." });
+        io.emit("all-rooms", listOfRooms);
         // still need to alert the host that someone has joined but ill do that later.
       } else {
-        console.log("Room is full");
         socket.emit("room-full", { success: false, message: "Room is full." });
       }
     } else {
-      console.log("Room does not exist");
       socket.emit("room-not-found", { success: false, message: "Room does not exist." });
     }
   });
@@ -75,16 +75,28 @@ io.on("connection", (socket) => {
   // leave room
   socket.on("leave-room", ({ roomID }) => {
     if (socket.id === listOfRooms[roomID].socketIDHost) {
-      delete listOfRooms[roomID];
-      console.log("Host left the room");
-      // ok so i would need to add some more logic here to handle host leaving
-      // maybe like close the room down or whatever.
-    } else if (socket.id === listOfRooms[roomID].socketIDPeer) {
-      // need to alert host that peer has left
+      const { socketIDHost, socketIDPeer } = listOfRooms[roomID];
+      delete listOfUsersInRoom[socketIDHost];
+      if (socketIDPeer) {
+        delete listOfUsersInRoom[socketIDPeer];
+      }
 
-      // handle it locally
+      delete listOfRooms[roomID];
+
+      io.to(roomID).emit("force-leave-room", { message: "host has left, closing room." });
+
+      socket.leave(roomID);
+
+      io.emit("all-rooms", listOfRooms);
+      io.emit("all-users", listOfUsersInRoom);
+    } else if (socket.id === listOfRooms[roomID].socketIDPeer) {
       listOfRooms[roomID].socketIDPeer = undefined;
       delete listOfUsersInRoom[socket.id];
+
+      socket.leave(roomID);
+
+      io.emit("all-rooms", listOfRooms);
+      io.emit("all-users", listOfUsersInRoom);
     }
   });
 
