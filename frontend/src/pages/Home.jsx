@@ -16,6 +16,28 @@ export default function Home({ socket, mySocketID }) {
     setName(newName);
   }, []);
 
+  useEffect(() => {
+    socket.on("room-joined", (data) => {
+      if (data.success) {
+        navigate(`/room/${inputRoomID}`, { state: { name } });
+      }
+    });
+
+    socket.on("room-full", (data) => {
+      console.log("Room is full:", data.message);
+    });
+
+    socket.on("room-not-found", (data) => {
+      console.log("Room not found:", data.message);
+    });
+
+    return () => {
+      socket.off("room-joined");
+      socket.off("room-full");
+      socket.off("room-not-found");
+    };
+  }, [roomID, name, navigate]);
+
   function updateName() {
     if (inputName === "") {
       // generate random name
@@ -34,7 +56,9 @@ export default function Home({ socket, mySocketID }) {
       return;
     }
     setRoomID(inputRoomID);
-    navigate(`/room/${inputRoomID}`, { state: { name } });
+    socket.emit("add-user", { socketID: mySocketID, localName: name, roomID: inputRoomID });
+    socket.emit("join-room", { roomID: inputRoomID });
+    // navigate(`/room/${inputRoomID}`, { state: { name } });
   }
 
   function CreateRoom() {

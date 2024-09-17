@@ -54,7 +54,23 @@ io.on("connection", (socket) => {
   });
 
   // join room
-  socket.on("join-room", ({ roomID }) => {});
+  socket.on("join-room", ({ roomID }) => {
+    console.log(roomID);
+    if (listOfRooms.hasOwnProperty(roomID)) {
+      if (listOfRooms[roomID].socketIDPeer === undefined) {
+        listOfRooms[roomID].socketIDPeer = socket.id;
+        socket.join(roomID);
+        socket.emit("room-joined", { success: true, message: "Joined room." });
+        // still need to alert the host that someone has joined but ill do that later.
+      } else {
+        console.log("Room is full");
+        socket.emit("room-full", { success: false, message: "Room is full." });
+      }
+    } else {
+      console.log("Room does not exist");
+      socket.emit("room-not-found", { success: false, message: "Room does not exist." });
+    }
+  });
 
   // leave room
   socket.on("leave-room", ({ roomID }) => {
