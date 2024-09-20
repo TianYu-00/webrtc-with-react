@@ -94,7 +94,7 @@ export default function Room({ socket, mySocketID }) {
     getMediaStream();
 
     socket.on("offer", async ({ offer }) => {
-      console.log(socket.id, "Received offer for room");
+      console.log("Received offer for room:", offer);
       try {
         await rtcPeerConnection.current.setRemoteDescription(new RTCSessionDescription(offer));
 
@@ -120,6 +120,7 @@ export default function Room({ socket, mySocketID }) {
     });
 
     socket.on("ice-candidate", ({ candidate }) => {
+      // console.log("Received candidate for room:", candidate);
       if (rtcPeerConnection.current) {
         rtcPeerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
       }
