@@ -3,7 +3,7 @@ import { uniqueNamesGenerator, adjectives, colors, animals } from "unique-names-
 import { v4 as uuidv4 } from "uuid";
 import { useNavigate } from "react-router-dom";
 
-export default function Home() {
+export default function Home({ socket, mySocketID }) {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [roomID, setRoomID] = useState("");
@@ -15,6 +15,28 @@ export default function Home() {
     const newName = GenerateName();
     setName(newName);
   }, []);
+
+  useEffect(() => {
+    socket.on("room-joined", (data) => {
+      if (data.success) {
+        navigate(`/room/${inputRoomID}`, { state: { name, isHost: false } });
+      }
+    });
+
+    socket.on("room-full", (data) => {
+      console.log("Room is full:", data.message);
+    });
+
+    socket.on("room-not-found", (data) => {
+      console.log("Room not found:", data.message);
+    });
+
+    return () => {
+      socket.off("room-joined");
+      socket.off("room-full");
+      socket.off("room-not-found");
+    };
+  }, [roomID, name, navigate]);
 
   function updateName() {
     if (inputName === "") {
@@ -29,18 +51,29 @@ export default function Home() {
   }
 
   function JoinRoom() {
-    if (roomID === "") {
+    if (inputRoomID === "") {
       console.log("Room ID Empty");
       return;
     }
     setRoomID(inputRoomID);
-    console.log("Join Room");
-    navigate(`/room/${inputRoomID}`, { state: { name } });
+    socket.emit("add-user", { socketID: mySocketID, localName: name, roomID: inputRoomID });
+    socket.emit("join-room", { roomID: inputRoomID });
+    // navigate(`/room/${inputRoomID}`, { state: { name } });
   }
 
   function CreateRoom() {
+    if (!name || !mySocketID) {
+      console.log("Name or Socket ID is missing");
+      return;
+    }
+
     const newRoomID = uuidv4();
-    navigate(`/room/${newRoomID}`, { state: { name } });
+
+    socket.emit("add-user", { socketID: mySocketID, localName: name, roomID: newRoomID });
+
+    socket.emit("create-room", { roomID: newRoomID });
+
+    navigate(`/room/${newRoomID}`, { state: { name, isHost: true } });
     return;
   }
 
