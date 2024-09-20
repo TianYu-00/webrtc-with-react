@@ -18,6 +18,7 @@ export default function Room({ socket, mySocketID }) {
 
   // Room info
   const { roomID } = useParams();
+  const [isHost, setIsHost] = useState(false);
 
   // my info
   const [stream, setStream] = useState(null);
@@ -35,12 +36,37 @@ export default function Room({ socket, mySocketID }) {
   const peerVideo = useRef();
   const [peerName, setPeerName] = useState("");
 
+  const rtcPeerConnection = useRef(null);
+
   useEffect(() => {
     const myAssignedName = location.state.name;
     setMyName(myAssignedName);
-  }, []);
+    const amIHost = location.state.isHost;
+    setIsHost(amIHost);
+  }, [location.state]);
 
   useEffect(() => {
+    const configuration = {
+      iceServers: [{ urls: "stun:stun1.google.com:19302" }],
+    };
+
+    rtcPeerConnection.current = new RTCPeerConnection(configuration);
+
+    rtcPeerConnection.current.onicecandidate = (event) => {
+      if (event.candidate) {
+        socket.emit("ice-candidate", { candidate: event.candidate });
+      }
+    };
+
+    rtcPeerConnection.current.ontrack = (event) => {
+      console.log("Received remote track:", event.track);
+      const remoteStream = event.streams[0];
+
+      if (peerVideo.current) {
+        peerVideo.current.srcObject = remoteStream;
+      }
+    };
+
     const getMediaStream = async () => {
       try {
         const constraints = {
@@ -50,13 +76,76 @@ export default function Room({ socket, mySocketID }) {
         const currentStream = await navigator.mediaDevices.getUserMedia(constraints);
         setStream(currentStream);
         myVideo.current.srcObject = currentStream;
+
+        currentStream.getTracks().forEach((track) => {
+          rtcPeerConnection.current.addTrack(track, currentStream);
+        });
+
+        if (isHost) {
+          socket.on("peer-joined", async () => {
+            await createOffer();
+          });
+        }
       } catch (error) {
         console.error("Error accessing media devices:", error);
       }
     };
 
     getMediaStream();
-  }, [selectedCamera, selectedAudioInput]);
+
+    socket.on("offer", async ({ offer }) => {
+      console.log(socket.id, "Received offer for room");
+      try {
+        await rtcPeerConnection.current.setRemoteDescription(new RTCSessionDescription(offer));
+
+        // create answer
+        const answer = await rtcPeerConnection.current.createAnswer();
+        await rtcPeerConnection.current.setLocalDescription(answer);
+
+        // send answer back
+        socket.emit("answer", { answer });
+        console.log("Sending answer:", answer);
+      } catch (error) {
+        console.error("Error handling offer:", error);
+      }
+    });
+
+    socket.on("answer", async ({ answer }) => {
+      console.log("Received answer for room:", answer);
+      try {
+        await rtcPeerConnection.current.setRemoteDescription(new RTCSessionDescription(answer));
+      } catch (error) {
+        console.error("Error setting remote description for answer:", error);
+      }
+    });
+
+    socket.on("ice-candidate", ({ candidate }) => {
+      if (rtcPeerConnection.current) {
+        rtcPeerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
+      }
+    });
+
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+      socket.off("peer-joined");
+      socket.off("offer");
+      socket.off("answer");
+      socket.off("ice-candidate");
+    };
+  }, [selectedCamera, selectedAudioInput, isHost]);
+
+  const createOffer = async () => {
+    try {
+      const offer = await rtcPeerConnection.current.createOffer();
+      await rtcPeerConnection.current.setLocalDescription(offer);
+      socket.emit("offer", { offer });
+      console.log("Sending offer:", offer);
+    } catch (error) {
+      console.error("Error creating offer:", error);
+    }
+  };
 
   useEffect(() => {
     socket.on("force-leave-room", (data) => {
@@ -110,7 +199,7 @@ export default function Room({ socket, mySocketID }) {
             </div>
             {/* Peer Video */}
             <div className="w-full h-1/2 border border-gray-700 bg-black flex justify-center items-center relative">
-              <video className="h-full " autoPlay muted ref={peerVideo}></video>
+              <video className="h-full " autoPlay ref={peerVideo}></video>
               <div className="absolute bottom-0 left-2">
                 <p>{peerName}</p>
               </div>

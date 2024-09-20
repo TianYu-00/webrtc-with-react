@@ -19,7 +19,7 @@ export default function Home({ socket, mySocketID }) {
   useEffect(() => {
     socket.on("room-joined", (data) => {
       if (data.success) {
-        navigate(`/room/${inputRoomID}`, { state: { name } });
+        navigate(`/room/${inputRoomID}`, { state: { name, isHost: false } });
       }
     });
 
@@ -73,7 +73,7 @@ export default function Home({ socket, mySocketID }) {
 
     socket.emit("create-room", { roomID: newRoomID });
 
-    navigate(`/room/${newRoomID}`, { state: { name } });
+    navigate(`/room/${newRoomID}`, { state: { name, isHost: true } });
     return;
   }
 

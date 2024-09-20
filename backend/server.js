@@ -50,6 +50,7 @@ io.on("connection", (socket) => {
       };
       socket.join(roomID);
       io.emit("all-rooms", listOfRooms);
+      socket.emit("room-created", { roomID, isHost: true });
     } else {
       console.log("User not found");
     }
@@ -63,7 +64,11 @@ io.on("connection", (socket) => {
         socket.join(roomID);
         socket.emit("room-joined", { success: true, message: "Joined room." });
         io.emit("all-rooms", listOfRooms);
-        // still need to alert the host that someone has joined but ill do that later.
+
+        const hostSocketID = listOfRooms[roomID].socketIDHost;
+        if (hostSocketID) {
+          io.to(hostSocketID).emit("peer-joined");
+        }
       } else {
         socket.emit("room-full", { success: false, message: "Room is full." });
       }
@@ -100,11 +105,67 @@ io.on("connection", (socket) => {
     }
   });
 
-  // offer
+  // handle offer
+  socket.on("offer", ({ offer }) => {
+    const user = listOfUsersInRoom[socket.id];
+    const room = listOfRooms[user.currentRoom];
+    console.log(socket.id, "Received offer for room");
+    if (room) {
+      const offerTo = () => {
+        if (socket.id === room.socketIDHost) {
+          return room.socketIDPeer;
+        } else {
+          return room.socketIDHost;
+        }
+      };
+      const targetSocketID = offerTo();
+      socket.to(targetSocketID).emit("offer", { offer });
+    } else {
+      console.log(`Room ${room} not found for offer.`);
+    }
+  });
 
-  // answer
+  // handle answer
+  socket.on("answer", ({ answer }) => {
+    const user = listOfUsersInRoom[socket.id];
+    const room = listOfRooms[user.currentRoom];
+    console.log(socket.id, "Received answer for room");
+    if (room) {
+      // console.log("answer", answer);
+      const offerTo = () => {
+        if (socket.id === room.socketIDHost) {
+          return room.socketIDPeer;
+        } else {
+          return room.socketIDHost;
+        }
+      };
+      const targetSocketID = offerTo();
+      socket.to(targetSocketID).emit("answer", { answer });
+    } else {
+      console.log(`Room ${room} not found for answer.`);
+    }
+  });
 
-  // ice-candidate
+  // handle ICE candidate exchange
+  socket.on("ice-candidate", ({ candidate }) => {
+    const user = listOfUsersInRoom[socket.id];
+    const room = listOfRooms[user.currentRoom];
+    console.log(socket.id, "Received candidate for room");
+    if (room) {
+      // console.log("candidate", candidate);
+      const offerTo = () => {
+        if (socket.id === room.socketIDHost) {
+          return room.socketIDPeer;
+        } else {
+          return room.socketIDHost;
+        }
+      };
+      const targetSocketID = offerTo();
+      socket.to(targetSocketID).emit("ice-candidate", { candidate });
+    } else {
+      console.log(`Room ${room} not found for ICE candidate.`);
+    }
+  });
 
   // Disconnect Handler
   socket.on("disconnect", () => {
@@ -118,6 +179,10 @@ io.on("connection", (socket) => {
 server.listen(serverPort, () => {
   console.log(`Server is running on port ${serverPort}`);
 });
+
+//////////////////////////////////////////////////////////////////////////////
+// Comments
+//////////////////////////////////////////////////////////////////////////////
 
 // Need to spend more time looking into:
 // Peer Handler* - https://webrtc.org/getting-started/peer-connections-advanced
@@ -134,6 +199,10 @@ server.listen(serverPort, () => {
 // More info on media devices
 // https://webrtc.org/getting-started/media-devices#using-asyncawait_1
 
+//////////////////////////////////////////////////////////////////////////////
+// Layout for objects
+//////////////////////////////////////////////////////////////////////////////
+
 // list of users
 /*
   {
@@ -146,4 +215,99 @@ server.listen(serverPort, () => {
   {
     roomID: {socketIDHost:hostSocketID, socketIDPeer:peerSocketID}
   }
+*/
+//////////////////////////////////////////////////////////////////////////////
+// Steps to set up RTCPeerConnection: document what I did to make it functional for future reference.
+//////////////////////////////////////////////////////////////////////////////
+
+/*
+Create the stun server configuration for my RTCPeerConnection:
+ const configuration = {
+      iceServers: [{ urls: "stun:stun1.google.com:19302" }],
+    };
+
+Create the connection:
+  rtcPeerConnection.current = new RTCPeerConnection(configuration);
+
+Now i need to create the onicecandidate:
+  rtcPeerConnection.current.onicecandidate = (event) => {
+      if (event.candidate) {
+        socket.emit("ice-candidate", { candidate: event.candidate });
+      }
+    };
+
+add remote track to remote video reference:
+  rtcPeerConnection.current.ontrack = (event) => {
+      const remoteStream = event.streams[0];
+      if (peerVideo.current) {
+        peerVideo.current.srcObject = remoteStream;
+      }
+    };
+
+Now we need to set up our media stream for local track:
+  const getMediaStream = async () => {
+            try {
+                const currentStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                if (myVideo.current) {
+                    myVideo.current.srcObject = currentStream;
+                }
+            } catch (error) {
+                console.error('error:', error);
+            }
+        };
+        getMediaStream();
+
+
+Now get the current local track and add it to peer connection:
+  currentStream.getTracks().forEach((track) => {
+          rtcPeerConnection.current.addTrack(track, currentStream);
+        });
+
+For the host or whatever (user1), create an offer when peer joins the room:
+  const createOffer = async () => {
+    try {
+      const offer = await rtcPeerConnection.current.createOffer();
+      await rtcPeerConnection.current.setLocalDescription(offer);
+      socket.emit("offer", { offer });
+      console.log("Sending offer:", offer);
+    } catch (error) {
+      console.error("Error creating offer:", error);
+    }
+  };
+
+When offer is created, the other end (user2) needs to receive the offer to set remote description and create an answer to set as local description + reply with an answer
+  socket.on("offer", async ({ offer }) => {
+      console.log(socket.id, "Received offer for room");
+      try {
+        await rtcPeerConnection.current.setRemoteDescription(new RTCSessionDescription(offer));
+
+        // create answer
+        const answer = await rtcPeerConnection.current.createAnswer();
+        await rtcPeerConnection.current.setLocalDescription(answer);
+
+        // send answer back
+        socket.emit("answer", { answer });
+        console.log("Sending answer:", answer);
+      } catch (error) {
+        console.error("Error handling offer:", error);
+      }
+    });
+
+Now the host or whatever(user1) needs to receive the answer and set it as remote description:
+  socket.on("answer", async ({ answer }) => {
+      console.log("Received answer for room:", answer);
+      try {
+        await rtcPeerConnection.current.setRemoteDescription(new RTCSessionDescription(answer));
+      } catch (error) {
+        console.error("Error setting remote description for answer:", error);
+      }
+    });
+
+Finally we need to exchange ice candidates:
+  socket.on("ice-candidate", ({ candidate }) => {
+      if (rtcPeerConnection.current) {
+        rtcPeerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
+      }
+    });
+
 */
