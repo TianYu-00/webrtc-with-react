@@ -59,7 +59,7 @@ export default function Room({ socket, mySocketID }) {
     };
 
     rtcPeerConnection.current.ontrack = (event) => {
-      console.log("Received remote track:", event.track);
+      // console.log("Received remote track:", event.track);
       const remoteStream = event.streams[0];
 
       if (peerVideo.current) {
@@ -153,8 +153,22 @@ export default function Room({ socket, mySocketID }) {
       navigate(`/`);
     });
 
+    socket.on("peer-leave", (data) => {
+      console.log(data.message);
+      if (peerVideo.current.srcObject) {
+        peerVideo.current.srcObject = null;
+      }
+      if (rtcPeerConnection.current) {
+        rtcPeerConnection.current.onicecandidate = null;
+        rtcPeerConnection.current.ontrack = null;
+        rtcPeerConnection.current.close();
+        rtcPeerConnection.current = null;
+      }
+    });
+
     return () => {
       socket.off("force-leave-room");
+      socket.off("peer-leave");
     };
   }, []);
 

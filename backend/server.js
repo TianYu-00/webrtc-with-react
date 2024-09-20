@@ -100,6 +100,8 @@ io.on("connection", (socket) => {
 
       socket.leave(roomID);
 
+      io.to(roomID).emit("peer-leave", { message: "peer has left" });
+
       io.emit("all-rooms", listOfRooms);
       io.emit("all-users", listOfUsersInRoom);
     }
