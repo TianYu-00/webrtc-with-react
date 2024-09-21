@@ -52,6 +52,10 @@ export default function Room({ socket, mySocketID }) {
 
     rtcPeerConnection.current = new RTCPeerConnection(configuration);
 
+    rtcPeerConnection.current.oniceconnectionstatechange = () => {
+      console.log("ICE Connection State Change:", rtcPeerConnection.current.iceConnectionState);
+    };
+
     rtcPeerConnection.current.onicecandidate = (event) => {
       if (event.candidate) {
         socket.emit("ice-candidate", { candidate: event.candidate });
@@ -59,7 +63,7 @@ export default function Room({ socket, mySocketID }) {
     };
 
     rtcPeerConnection.current.ontrack = (event) => {
-      // console.log("Received remote track:", event.track);
+      console.log("Received remote track:", event.track);
       const remoteStream = event.streams[0];
 
       if (peerVideo.current) {
@@ -67,6 +71,10 @@ export default function Room({ socket, mySocketID }) {
       }
     };
 
+    return () => {};
+  }, []);
+
+  useEffect(() => {
     const getMediaStream = async () => {
       try {
         const constraints = {
@@ -76,22 +84,37 @@ export default function Room({ socket, mySocketID }) {
         const currentStream = await navigator.mediaDevices.getUserMedia(constraints);
         setStream(currentStream);
         myVideo.current.srcObject = currentStream;
-
-        currentStream.getTracks().forEach((track) => {
-          rtcPeerConnection.current.addTrack(track, currentStream);
-        });
-
-        if (isHost) {
-          socket.on("peer-joined", async () => {
-            await createOffer();
-          });
-        }
       } catch (error) {
         console.error("Error accessing media devices:", error);
       }
     };
 
     getMediaStream();
+
+    return () => {};
+  }, [selectedCamera, selectedAudioInput]);
+
+  useEffect(() => {
+    if (stream) {
+      const existingSenders = rtcPeerConnection.current.getSenders();
+      existingSenders.forEach((sender) => {
+        rtcPeerConnection.current.removeTrack(sender);
+      });
+
+      stream.getTracks().forEach((track) => {
+        rtcPeerConnection.current.addTrack(track, stream);
+        console.log("Added track:", track);
+      });
+
+      const localTracks = rtcPeerConnection.current.getSenders().map((sender) => sender.track);
+      console.log("Current local tracks:", localTracks);
+    }
+  }, [stream]);
+
+  useEffect(() => {
+    socket.on("peer-joined", async () => {
+      await createOffer();
+    });
 
     socket.on("offer", async ({ offer }) => {
       console.log("Received offer for room:", offer);
@@ -127,15 +150,12 @@ export default function Room({ socket, mySocketID }) {
     });
 
     return () => {
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
-      }
       socket.off("peer-joined");
       socket.off("offer");
       socket.off("answer");
       socket.off("ice-candidate");
     };
-  }, [selectedCamera, selectedAudioInput, isHost]);
+  }, []);
 
   const createOffer = async () => {
     try {
