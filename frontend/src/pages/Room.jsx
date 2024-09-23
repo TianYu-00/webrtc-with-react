@@ -38,6 +38,9 @@ export default function Room({ socket, mySocketID }) {
 
   const rtcPeerConnection = useRef(null);
 
+  // pending
+  const [isPeerReady, setIsPeerReady] = useState(false);
+
   useEffect(() => {
     const myAssignedName = location.state.name;
     setMyName(myAssignedName);
@@ -84,6 +87,31 @@ export default function Room({ socket, mySocketID }) {
         const currentStream = await navigator.mediaDevices.getUserMedia(constraints);
         setStream(currentStream);
         myVideo.current.srcObject = currentStream;
+
+        const existingSenders = rtcPeerConnection.current.getSenders();
+        existingSenders.forEach((sender) => {
+          rtcPeerConnection.current.removeTrack(sender);
+        });
+
+        currentStream.getTracks().forEach((track) => {
+          rtcPeerConnection.current.addTrack(track, currentStream);
+          // console.log("Added track:", track);
+        });
+
+        const localTracks = rtcPeerConnection.current.getSenders().map((sender) => sender.track);
+        // console.log("Current local tracks:", localTracks);
+
+        const amIHost = location.state.isHost;
+        if (amIHost) {
+          socket.on("peer-is-ready", async ({ roomID }) => {
+            console.log(`Peer is ready to accept in room ${roomID}`);
+
+            setIsPeerReady(true);
+          });
+        }
+        if (!amIHost) {
+          socket.emit("peer-ready-to-accept", { roomID });
+        }
       } catch (error) {
         console.error("Error accessing media devices:", error);
       }
@@ -95,26 +123,13 @@ export default function Room({ socket, mySocketID }) {
   }, [selectedCamera, selectedAudioInput]);
 
   useEffect(() => {
-    if (stream) {
-      const existingSenders = rtcPeerConnection.current.getSenders();
-      existingSenders.forEach((sender) => {
-        rtcPeerConnection.current.removeTrack(sender);
-      });
-
-      stream.getTracks().forEach((track) => {
-        rtcPeerConnection.current.addTrack(track, stream);
-        console.log("Added track:", track);
-      });
-
-      const localTracks = rtcPeerConnection.current.getSenders().map((sender) => sender.track);
-      console.log("Current local tracks:", localTracks);
+    if (isPeerReady) {
+      createOffer();
     }
-  }, [stream]);
+  }, [isPeerReady]);
 
   useEffect(() => {
-    socket.on("peer-joined", async () => {
-      await createOffer();
-    });
+    // socket.on("peer-joined", async () => {});
 
     socket.on("offer", async ({ offer }) => {
       console.log("Received offer for room:", offer);

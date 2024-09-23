@@ -107,6 +107,24 @@ io.on("connection", (socket) => {
     }
   });
 
+  // ready to accept
+  socket.on("peer-ready-to-accept", ({ roomID }) => {
+    const user = listOfUsersInRoom[socket.id];
+    const room = listOfRooms[roomID];
+
+    if (room) {
+      // Determine who the initiator is
+      const initiatorSocketID = room.socketIDHost === socket.id ? room.socketIDPeer : room.socketIDHost;
+
+      // Emit to the initiator that the peer is ready
+      if (initiatorSocketID) {
+        io.to(initiatorSocketID).emit("peer-is-ready", { roomID });
+      }
+    } else {
+      console.log(`Room ${roomID} not found for peer-ready-to-accept.`);
+    }
+  });
+
   // handle offer
   socket.on("offer", ({ offer }) => {
     const user = listOfUsersInRoom[socket.id];
@@ -261,6 +279,12 @@ Now we need to set up our media stream for local track:
 
 
 Now get the current local track and add it to peer connection:
+  // clear existing tracks first
+  const existingSenders = rtcPeerConnection.current.getSenders();
+          existingSenders.forEach((sender) => {
+            rtcPeerConnection.current.removeTrack(sender);
+          });
+  // then we add the tracks
   currentStream.getTracks().forEach((track) => {
           rtcPeerConnection.current.addTrack(track, currentStream);
         });
