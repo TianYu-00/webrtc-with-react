@@ -119,7 +119,11 @@ export default function Room({ socket, mySocketID }) {
 
     getMediaStream();
 
-    return () => {};
+    return () => {
+      if (location.state.isHost) {
+        socket.off("peer-is-ready");
+      }
+    };
   }, [selectedCamera, selectedAudioInput]);
 
   useEffect(() => {
@@ -165,7 +169,7 @@ export default function Room({ socket, mySocketID }) {
     });
 
     return () => {
-      socket.off("peer-joined");
+      // socket.off("peer-joined");
       socket.off("offer");
       socket.off("answer");
       socket.off("ice-candidate");
@@ -194,12 +198,13 @@ export default function Room({ socket, mySocketID }) {
       if (peerVideo.current.srcObject) {
         peerVideo.current.srcObject = null;
       }
-      if (rtcPeerConnection.current) {
-        rtcPeerConnection.current.onicecandidate = null;
-        rtcPeerConnection.current.ontrack = null;
-        rtcPeerConnection.current.close();
-        rtcPeerConnection.current = null;
-      }
+      // if (rtcPeerConnection.current) {
+      //   rtcPeerConnection.current.onicecandidate = null;
+      //   rtcPeerConnection.current.ontrack = null;
+      //   rtcPeerConnection.current.close();
+      //   rtcPeerConnection.current = null;
+      // }
+      setIsPeerReady(false);
     });
 
     return () => {

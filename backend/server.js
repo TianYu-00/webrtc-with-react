@@ -129,7 +129,7 @@ io.on("connection", (socket) => {
   socket.on("offer", ({ offer }) => {
     const user = listOfUsersInRoom[socket.id];
     const room = listOfRooms[user.currentRoom];
-    console.log(socket.id, "Received offer for room");
+    console.log(socket.id, "Received offer to be sent");
     if (room) {
       const offerTo = () => {
         if (socket.id === room.socketIDHost) {
@@ -139,6 +139,7 @@ io.on("connection", (socket) => {
         }
       };
       const targetSocketID = offerTo();
+      console.log(socket.id, "Sending offer to", targetSocketID);
       socket.to(targetSocketID).emit("offer", { offer });
     } else {
       console.log(`Room ${room} not found for offer.`);
@@ -149,7 +150,7 @@ io.on("connection", (socket) => {
   socket.on("answer", ({ answer }) => {
     const user = listOfUsersInRoom[socket.id];
     const room = listOfRooms[user.currentRoom];
-    console.log(socket.id, "Received answer for room");
+    console.log(socket.id, "Received answer to be sent");
     if (room) {
       // console.log("answer", answer);
       const offerTo = () => {
@@ -160,6 +161,7 @@ io.on("connection", (socket) => {
         }
       };
       const targetSocketID = offerTo();
+      console.log(socket.id, "Sending answer to", targetSocketID);
       socket.to(targetSocketID).emit("answer", { answer });
     } else {
       console.log(`Room ${room} not found for answer.`);
@@ -170,7 +172,7 @@ io.on("connection", (socket) => {
   socket.on("ice-candidate", ({ candidate }) => {
     const user = listOfUsersInRoom[socket.id];
     const room = listOfRooms[user.currentRoom];
-    console.log(socket.id, "Received candidate for room");
+    // console.log(socket.id, "Received candidate for room");
     if (room) {
       // console.log("candidate", candidate);
       const offerTo = () => {
@@ -189,6 +191,27 @@ io.on("connection", (socket) => {
 
   // Disconnect Handler
   socket.on("disconnect", () => {
+    // clean ups for whoever
+    const user = listOfUsersInRoom[socket.id];
+
+    if (user) {
+      const current_room = listOfRooms[user.currentRoom];
+
+      if (current_room && current_room.socketIDHost === socket.id) {
+        delete listOfUsersInRoom[current_room.socketIDPeer];
+        delete listOfRooms[user.currentRoom];
+        socket.leave(user.currentRoom);
+        io.to(user.currentRoom).emit("force-leave-room", { message: "Host has left, closing room." });
+      } else if (current_room && current_room.socketIDPeer === socket.id) {
+        current_room.socketIDPeer = undefined;
+        socket.leave(user.currentRoom);
+        io.to(user.currentRoom).emit("peer-leave", { message: "Peer has disconnected." });
+      }
+
+      io.emit("all-rooms", listOfRooms);
+      io.emit("all-users", listOfUsersInRoom);
+    }
+
     connectedCounter--;
     console.log(connectedCounter, "users online");
     io.emit("all-users-connected", connectedCounter);
