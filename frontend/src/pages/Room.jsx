@@ -40,6 +40,7 @@ export default function Room({ socket, mySocketID }) {
 
   // pending
   const [isPeerReady, setIsPeerReady] = useState(false);
+  const iceCandidateBuffer = useRef([]);
 
   useEffect(() => {
     const myAssignedName = location.state.name;
@@ -126,6 +127,13 @@ export default function Room({ socket, mySocketID }) {
     };
   }, [selectedCamera, selectedAudioInput]);
 
+  const processIceCandidates = async () => {
+    for (const candidate of iceCandidateBuffer.current) {
+      await rtcPeerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
+    }
+    iceCandidateBuffer.current.length = 0;
+  };
+
   useEffect(() => {
     const initiateOffer = async () => {
       if (isPeerReady) {
@@ -151,6 +159,9 @@ export default function Room({ socket, mySocketID }) {
         // send answer back
         socket.emit("answer", { answer });
         console.log("Sending answer:", answer);
+
+        // process buffered ICE candidates
+        await processIceCandidates();
       } catch (error) {
         console.error("Error handling offer:", error);
       }
@@ -160,15 +171,18 @@ export default function Room({ socket, mySocketID }) {
       console.log("Received answer for room:", answer);
       try {
         await rtcPeerConnection.current.setRemoteDescription(new RTCSessionDescription(answer));
+        await processIceCandidates();
       } catch (error) {
         console.error("Error setting remote description for answer:", error);
       }
     });
 
     socket.on("ice-candidate", ({ candidate }) => {
-      // console.log("Received candidate for room:", candidate);
-      if (rtcPeerConnection.current) {
+      console.log("Received candidate for room:", candidate);
+      if (rtcPeerConnection.current.remoteDescription) {
         rtcPeerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
+      } else {
+        iceCandidateBuffer.current.push(candidate);
       }
     });
 
