@@ -127,9 +127,13 @@ export default function Room({ socket, mySocketID }) {
   }, [selectedCamera, selectedAudioInput]);
 
   useEffect(() => {
-    if (isPeerReady) {
-      createOffer();
-    }
+    const initiateOffer = async () => {
+      if (isPeerReady) {
+        await createOffer();
+      }
+    };
+
+    initiateOffer();
   }, [isPeerReady]);
 
   useEffect(() => {
