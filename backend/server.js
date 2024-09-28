@@ -79,28 +79,23 @@ io.on("connection", (socket) => {
 
   // leave room
   socket.on("leave-room", ({ roomID }) => {
-    if (socket.id === listOfRooms[roomID].socketIDHost) {
-      const { socketIDHost, socketIDPeer } = listOfRooms[roomID];
+    const room = listOfRooms[roomID];
+
+    if (room) {
+      const { socketIDHost, socketIDPeer } = room;
+
       delete listOfUsersInRoom[socketIDHost];
-      if (socketIDPeer) {
-        delete listOfUsersInRoom[socketIDPeer];
+      delete listOfUsersInRoom[socketIDPeer];
+
+      io.to(roomID).emit("force-leave-room", { message: "someone has left, closing room." });
+
+      for (const userSocketID of [socketIDHost, socketIDPeer]) {
+        const userSocket = io.sockets.sockets.get(userSocketID);
+        if (userSocket) {
+          userSocket.leave(roomID);
+        }
       }
-
       delete listOfRooms[roomID];
-
-      io.to(roomID).emit("force-leave-room", { message: "host has left, closing room." });
-
-      socket.leave(roomID);
-
-      io.emit("all-rooms", listOfRooms);
-      io.emit("all-users", listOfUsersInRoom);
-    } else if (socket.id === listOfRooms[roomID].socketIDPeer) {
-      listOfRooms[roomID].socketIDPeer = undefined;
-      delete listOfUsersInRoom[socket.id];
-
-      socket.leave(roomID);
-
-      io.to(roomID).emit("peer-leave", { message: "peer has left" });
 
       io.emit("all-rooms", listOfRooms);
       io.emit("all-users", listOfUsersInRoom);
@@ -191,27 +186,6 @@ io.on("connection", (socket) => {
 
   // Disconnect Handler
   socket.on("disconnect", () => {
-    // clean ups for whoever
-    const user = listOfUsersInRoom[socket.id];
-
-    if (user) {
-      const current_room = listOfRooms[user.currentRoom];
-
-      if (current_room && current_room.socketIDHost === socket.id) {
-        delete listOfUsersInRoom[current_room.socketIDPeer];
-        delete listOfRooms[user.currentRoom];
-        socket.leave(user.currentRoom);
-        io.to(user.currentRoom).emit("force-leave-room", { message: "Host has left, closing room." });
-      } else if (current_room && current_room.socketIDPeer === socket.id) {
-        current_room.socketIDPeer = undefined;
-        socket.leave(user.currentRoom);
-        io.to(user.currentRoom).emit("peer-leave", { message: "Peer has disconnected." });
-      }
-
-      io.emit("all-rooms", listOfRooms);
-      io.emit("all-users", listOfUsersInRoom);
-    }
-
     connectedCounter--;
     console.log(connectedCounter, "users online");
     io.emit("all-users-connected", connectedCounter);

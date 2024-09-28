@@ -58,6 +58,10 @@ export default function Room({ socket, mySocketID }) {
 
     rtcPeerConnection.current.oniceconnectionstatechange = () => {
       console.log("ICE Connection State Change:", rtcPeerConnection.current.iceConnectionState);
+      if (rtcPeerConnection.current.iceConnectionState === "disconnected") {
+        socket.emit("leave-room", { roomID: roomID });
+        navigate(`/`);
+      }
     };
 
     rtcPeerConnection.current.onicecandidate = (event) => {
@@ -178,7 +182,7 @@ export default function Room({ socket, mySocketID }) {
     });
 
     socket.on("ice-candidate", ({ candidate }) => {
-      console.log("Received candidate for room:", candidate);
+      // console.log("Received candidate for room:", candidate);
       if (rtcPeerConnection.current.remoteDescription) {
         rtcPeerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
       } else {
@@ -211,23 +215,8 @@ export default function Room({ socket, mySocketID }) {
       navigate(`/`);
     });
 
-    socket.on("peer-leave", (data) => {
-      console.log(data.message);
-      if (peerVideo.current.srcObject) {
-        peerVideo.current.srcObject = null;
-      }
-      // if (rtcPeerConnection.current) {
-      //   rtcPeerConnection.current.onicecandidate = null;
-      //   rtcPeerConnection.current.ontrack = null;
-      //   rtcPeerConnection.current.close();
-      //   rtcPeerConnection.current = null;
-      // }
-      setIsPeerReady(false);
-    });
-
     return () => {
       socket.off("force-leave-room");
-      socket.off("peer-leave");
     };
   }, []);
 
