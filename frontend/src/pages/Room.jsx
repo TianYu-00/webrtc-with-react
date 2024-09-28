@@ -94,23 +94,31 @@ export default function Room({ socket, mySocketID }) {
         myVideo.current.srcObject = currentStream;
 
         const existingSenders = rtcPeerConnection.current.getSenders();
-        existingSenders.forEach((sender) => {
-          rtcPeerConnection.current.removeTrack(sender);
-        });
 
-        currentStream.getTracks().forEach((track) => {
-          rtcPeerConnection.current.addTrack(track, currentStream);
-          // console.log("Added track:", track);
-        });
+        const streamVideoTrack = currentStream.getVideoTracks()[0];
+        if (streamVideoTrack) {
+          const videoSender = existingSenders.find((sender) => sender.track.kind === "video");
+          if (videoSender) {
+            videoSender.replaceTrack(streamVideoTrack);
+          } else {
+            rtcPeerConnection.current.addTrack(streamVideoTrack, currentStream);
+          }
+        }
 
-        const localTracks = rtcPeerConnection.current.getSenders().map((sender) => sender.track);
-        // console.log("Current local tracks:", localTracks);
+        const streamAudioTrack = currentStream.getAudioTracks()[0];
+        if (streamAudioTrack) {
+          const audioSender = existingSenders.find((sender) => sender.track.kind === "audio");
+          if (audioSender) {
+            audioSender.replaceTrack(streamAudioTrack);
+          } else {
+            rtcPeerConnection.current.addTrack(streamAudioTrack, currentStream);
+          }
+        }
 
         const amIHost = location.state.isHost;
         if (amIHost) {
           socket.on("peer-is-ready", async ({ roomID }) => {
             console.log(`Peer is ready to accept in room ${roomID}`);
-
             setIsPeerReady(true);
           });
         }
