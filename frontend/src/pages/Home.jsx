@@ -56,9 +56,11 @@ export default function Home({ socket, mySocketID }) {
       return;
     }
     setRoomID(inputRoomID);
+    ////////////////////////////
+    // still need to do checks to see if room exist or not before doing below
+    ////////////////////////////
     socket.emit("add-user", { socketID: mySocketID, localName: name, roomID: inputRoomID });
     socket.emit("join-room", { roomID: inputRoomID });
-    // navigate(`/room/${inputRoomID}`, { state: { name } });
   }
 
   function CreateRoom() {

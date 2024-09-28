@@ -38,6 +38,10 @@ export default function Room({ socket, mySocketID }) {
 
   const rtcPeerConnection = useRef(null);
 
+  // pending
+  const [isPeerReady, setIsPeerReady] = useState(false);
+  const iceCandidateBuffer = useRef([]);
+
   useEffect(() => {
     const myAssignedName = location.state.name;
     setMyName(myAssignedName);
@@ -51,6 +55,14 @@ export default function Room({ socket, mySocketID }) {
     };
 
     rtcPeerConnection.current = new RTCPeerConnection(configuration);
+
+    rtcPeerConnection.current.oniceconnectionstatechange = () => {
+      console.log("ICE Connection State Change:", rtcPeerConnection.current.iceConnectionState);
+      if (rtcPeerConnection.current.iceConnectionState === "disconnected") {
+        socket.emit("leave-room", { roomID: roomID });
+        navigate(`/`);
+      }
+    };
 
     rtcPeerConnection.current.onicecandidate = (event) => {
       if (event.candidate) {
@@ -67,6 +79,10 @@ export default function Room({ socket, mySocketID }) {
       }
     };
 
+    return () => {};
+  }, []);
+
+  useEffect(() => {
     const getMediaStream = async () => {
       try {
         const constraints = {
@@ -77,14 +93,29 @@ export default function Room({ socket, mySocketID }) {
         setStream(currentStream);
         myVideo.current.srcObject = currentStream;
 
-        currentStream.getTracks().forEach((track) => {
-          rtcPeerConnection.current.addTrack(track, currentStream);
+        const existingSenders = rtcPeerConnection.current.getSenders();
+        existingSenders.forEach((sender) => {
+          rtcPeerConnection.current.removeTrack(sender);
         });
 
-        if (isHost) {
-          socket.on("peer-joined", async () => {
-            await createOffer();
+        currentStream.getTracks().forEach((track) => {
+          rtcPeerConnection.current.addTrack(track, currentStream);
+          // console.log("Added track:", track);
+        });
+
+        const localTracks = rtcPeerConnection.current.getSenders().map((sender) => sender.track);
+        // console.log("Current local tracks:", localTracks);
+
+        const amIHost = location.state.isHost;
+        if (amIHost) {
+          socket.on("peer-is-ready", async ({ roomID }) => {
+            console.log(`Peer is ready to accept in room ${roomID}`);
+
+            setIsPeerReady(true);
           });
+        }
+        if (!amIHost) {
+          socket.emit("peer-ready-to-accept", { roomID });
         }
       } catch (error) {
         console.error("Error accessing media devices:", error);
@@ -93,8 +124,35 @@ export default function Room({ socket, mySocketID }) {
 
     getMediaStream();
 
+    return () => {
+      if (location.state.isHost) {
+        socket.off("peer-is-ready");
+      }
+    };
+  }, [selectedCamera, selectedAudioInput]);
+
+  const processIceCandidates = async () => {
+    for (const candidate of iceCandidateBuffer.current) {
+      await rtcPeerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
+    }
+    iceCandidateBuffer.current.length = 0;
+  };
+
+  useEffect(() => {
+    const initiateOffer = async () => {
+      if (isPeerReady) {
+        await createOffer();
+      }
+    };
+
+    initiateOffer();
+  }, [isPeerReady]);
+
+  useEffect(() => {
+    // socket.on("peer-joined", async () => {});
+
     socket.on("offer", async ({ offer }) => {
-      console.log(socket.id, "Received offer for room");
+      console.log("Received offer for room:", offer);
       try {
         await rtcPeerConnection.current.setRemoteDescription(new RTCSessionDescription(offer));
 
@@ -105,6 +163,9 @@ export default function Room({ socket, mySocketID }) {
         // send answer back
         socket.emit("answer", { answer });
         console.log("Sending answer:", answer);
+
+        // process buffered ICE candidates
+        await processIceCandidates();
       } catch (error) {
         console.error("Error handling offer:", error);
       }
@@ -114,27 +175,28 @@ export default function Room({ socket, mySocketID }) {
       console.log("Received answer for room:", answer);
       try {
         await rtcPeerConnection.current.setRemoteDescription(new RTCSessionDescription(answer));
+        await processIceCandidates();
       } catch (error) {
         console.error("Error setting remote description for answer:", error);
       }
     });
 
     socket.on("ice-candidate", ({ candidate }) => {
-      if (rtcPeerConnection.current) {
+      // console.log("Received candidate for room:", candidate);
+      if (rtcPeerConnection.current.remoteDescription) {
         rtcPeerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
+      } else {
+        iceCandidateBuffer.current.push(candidate);
       }
     });
 
     return () => {
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
-      }
-      socket.off("peer-joined");
+      // socket.off("peer-joined");
       socket.off("offer");
       socket.off("answer");
       socket.off("ice-candidate");
     };
-  }, [selectedCamera, selectedAudioInput, isHost]);
+  }, []);
 
   const createOffer = async () => {
     try {

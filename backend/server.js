@@ -79,29 +79,44 @@ io.on("connection", (socket) => {
 
   // leave room
   socket.on("leave-room", ({ roomID }) => {
-    if (socket.id === listOfRooms[roomID].socketIDHost) {
-      const { socketIDHost, socketIDPeer } = listOfRooms[roomID];
-      delete listOfUsersInRoom[socketIDHost];
-      if (socketIDPeer) {
-        delete listOfUsersInRoom[socketIDPeer];
-      }
+    const room = listOfRooms[roomID];
 
+    if (room) {
+      const { socketIDHost, socketIDPeer } = room;
+
+      delete listOfUsersInRoom[socketIDHost];
+      delete listOfUsersInRoom[socketIDPeer];
+
+      io.to(roomID).emit("force-leave-room", { message: "someone has left, closing room." });
+
+      for (const userSocketID of [socketIDHost, socketIDPeer]) {
+        const userSocket = io.sockets.sockets.get(userSocketID);
+        if (userSocket) {
+          userSocket.leave(roomID);
+        }
+      }
       delete listOfRooms[roomID];
 
-      io.to(roomID).emit("force-leave-room", { message: "host has left, closing room." });
-
-      socket.leave(roomID);
-
       io.emit("all-rooms", listOfRooms);
       io.emit("all-users", listOfUsersInRoom);
-    } else if (socket.id === listOfRooms[roomID].socketIDPeer) {
-      listOfRooms[roomID].socketIDPeer = undefined;
-      delete listOfUsersInRoom[socket.id];
+    }
+  });
 
-      socket.leave(roomID);
+  // ready to accept
+  socket.on("peer-ready-to-accept", ({ roomID }) => {
+    const user = listOfUsersInRoom[socket.id];
+    const room = listOfRooms[roomID];
 
-      io.emit("all-rooms", listOfRooms);
-      io.emit("all-users", listOfUsersInRoom);
+    if (room) {
+      // Determine who the initiator is
+      const initiatorSocketID = room.socketIDHost === socket.id ? room.socketIDPeer : room.socketIDHost;
+
+      // Emit to the initiator that the peer is ready
+      if (initiatorSocketID) {
+        io.to(initiatorSocketID).emit("peer-is-ready", { roomID });
+      }
+    } else {
+      console.log(`Room ${roomID} not found for peer-ready-to-accept.`);
     }
   });
 
@@ -109,7 +124,7 @@ io.on("connection", (socket) => {
   socket.on("offer", ({ offer }) => {
     const user = listOfUsersInRoom[socket.id];
     const room = listOfRooms[user.currentRoom];
-    console.log(socket.id, "Received offer for room");
+    console.log(socket.id, "Received offer to be sent");
     if (room) {
       const offerTo = () => {
         if (socket.id === room.socketIDHost) {
@@ -119,6 +134,7 @@ io.on("connection", (socket) => {
         }
       };
       const targetSocketID = offerTo();
+      console.log(socket.id, "Sending offer to", targetSocketID);
       socket.to(targetSocketID).emit("offer", { offer });
     } else {
       console.log(`Room ${room} not found for offer.`);
@@ -129,7 +145,7 @@ io.on("connection", (socket) => {
   socket.on("answer", ({ answer }) => {
     const user = listOfUsersInRoom[socket.id];
     const room = listOfRooms[user.currentRoom];
-    console.log(socket.id, "Received answer for room");
+    console.log(socket.id, "Received answer to be sent");
     if (room) {
       // console.log("answer", answer);
       const offerTo = () => {
@@ -140,6 +156,7 @@ io.on("connection", (socket) => {
         }
       };
       const targetSocketID = offerTo();
+      console.log(socket.id, "Sending answer to", targetSocketID);
       socket.to(targetSocketID).emit("answer", { answer });
     } else {
       console.log(`Room ${room} not found for answer.`);
@@ -150,7 +167,7 @@ io.on("connection", (socket) => {
   socket.on("ice-candidate", ({ candidate }) => {
     const user = listOfUsersInRoom[socket.id];
     const room = listOfRooms[user.currentRoom];
-    console.log(socket.id, "Received candidate for room");
+    // console.log(socket.id, "Received candidate for room");
     if (room) {
       // console.log("candidate", candidate);
       const offerTo = () => {
@@ -259,6 +276,12 @@ Now we need to set up our media stream for local track:
 
 
 Now get the current local track and add it to peer connection:
+  // clear existing tracks first
+  const existingSenders = rtcPeerConnection.current.getSenders();
+          existingSenders.forEach((sender) => {
+            rtcPeerConnection.current.removeTrack(sender);
+          });
+  // then we add the tracks
   currentStream.getTracks().forEach((track) => {
           rtcPeerConnection.current.addTrack(track, currentStream);
         });
