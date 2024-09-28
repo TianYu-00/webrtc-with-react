@@ -18,7 +18,6 @@ export default function Room({ socket, mySocketID }) {
 
   // Room info
   const { roomID } = useParams();
-  const [isHost, setIsHost] = useState(false);
 
   // my info
   const [stream, setStream] = useState(null);
@@ -45,8 +44,6 @@ export default function Room({ socket, mySocketID }) {
   useEffect(() => {
     const myAssignedName = location.state.name;
     setMyName(myAssignedName);
-    const amIHost = location.state.isHost;
-    setIsHost(amIHost);
   }, [location.state]);
 
   useEffect(() => {
@@ -94,23 +91,31 @@ export default function Room({ socket, mySocketID }) {
         myVideo.current.srcObject = currentStream;
 
         const existingSenders = rtcPeerConnection.current.getSenders();
-        existingSenders.forEach((sender) => {
-          rtcPeerConnection.current.removeTrack(sender);
-        });
 
-        currentStream.getTracks().forEach((track) => {
-          rtcPeerConnection.current.addTrack(track, currentStream);
-          // console.log("Added track:", track);
-        });
+        const streamVideoTrack = currentStream.getVideoTracks()[0];
+        if (streamVideoTrack) {
+          const videoSender = existingSenders.find((sender) => sender.track.kind === "video");
+          if (videoSender) {
+            videoSender.replaceTrack(streamVideoTrack);
+          } else {
+            rtcPeerConnection.current.addTrack(streamVideoTrack, currentStream);
+          }
+        }
 
-        const localTracks = rtcPeerConnection.current.getSenders().map((sender) => sender.track);
-        // console.log("Current local tracks:", localTracks);
+        const streamAudioTrack = currentStream.getAudioTracks()[0];
+        if (streamAudioTrack) {
+          const audioSender = existingSenders.find((sender) => sender.track.kind === "audio");
+          if (audioSender) {
+            audioSender.replaceTrack(streamAudioTrack);
+          } else {
+            rtcPeerConnection.current.addTrack(streamAudioTrack, currentStream);
+          }
+        }
 
         const amIHost = location.state.isHost;
         if (amIHost) {
           socket.on("peer-is-ready", async ({ roomID }) => {
             console.log(`Peer is ready to accept in room ${roomID}`);
-
             setIsPeerReady(true);
           });
         }
@@ -271,9 +276,13 @@ export default function Room({ socket, mySocketID }) {
               setSelectedCamera={setSelectedCamera}
               setSelectedAudioInput={setSelectedAudioInput}
               setSelectedAudioOutput={setSelectedAudioOutput}
+              selectedCamera={selectedCamera}
+              selectedAudioInput={selectedAudioInput}
+              selectedAudioOutput={selectedAudioOutput}
               roomID={roomID}
               myName={myName}
               mySocketID={mySocketID}
+              videoElementRefs={[myVideo, peerVideo]}
             />
           </div>
         </div>
@@ -358,9 +367,13 @@ function SettingsModal({
   setSelectedCamera,
   setSelectedAudioInput,
   setSelectedAudioOutput,
+  selectedCamera,
+  selectedAudioInput,
+  selectedAudioOutput,
   roomID,
   myName,
   mySocketID,
+  videoElementRefs,
 }) {
   const [cameraDevices, setCameraDevices] = useState([]);
   const [audioInputDevices, setAudioInputDevices] = useState([]);
@@ -383,6 +396,18 @@ function SettingsModal({
     fetchDevices();
   }, [isSettingHidden]);
 
+  async function handleRemoteAudioOutputChange(deviceId) {
+    for (const videoRef of videoElementRefs) {
+      if (videoRef.current) {
+        try {
+          await videoRef.current.setSinkId(deviceId);
+        } catch (error) {
+          console.error("Error setting audio output:", error);
+        }
+      }
+    }
+  }
+
   if (isSettingHidden) return null;
 
   return (
@@ -394,6 +419,7 @@ function SettingsModal({
           id="cameras"
           className="w-full border rounded p-2"
           onChange={(e) => setSelectedCamera(e.target.value)}
+          value={selectedCamera}
         >
           {cameraDevices.map((currentCamera) => (
             <option value={currentCamera.deviceId} key={currentCamera.deviceId}>
@@ -409,6 +435,7 @@ function SettingsModal({
           id="audio-inputs"
           className="w-full border rounded p-2"
           onChange={(e) => setSelectedAudioInput(e.target.value)}
+          value={selectedAudioInput}
         >
           {audioInputDevices.map((currentAudioInput) => (
             <option value={currentAudioInput.deviceId} key={currentAudioInput.deviceId}>
@@ -423,7 +450,12 @@ function SettingsModal({
           name="audio-outputs"
           id="audio-outputs"
           className="w-full border rounded p-2"
-          onChange={(e) => setSelectedAudioOutput(e.target.value)}
+          onChange={(e) => {
+            const selectedDeviceId = e.target.value;
+            setSelectedAudioOutput(selectedDeviceId);
+            handleRemoteAudioOutputChange(selectedDeviceId);
+          }}
+          value={selectedAudioOutput}
         >
           {audioOutputDevices.map((currentAudioOutput) => (
             <option value={currentAudioOutput.deviceId} key={currentAudioOutput.deviceId}>
