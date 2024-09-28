@@ -216,6 +216,10 @@ server.listen(serverPort, () => {
 // More info on media devices
 // https://webrtc.org/getting-started/media-devices#using-asyncawait_1
 
+// replaceTrack function could be easily used to replace current tracks.
+// guessing it should also work for screen sharing as well if i can get the screen with getDisplayMedia
+// https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getDisplayMedia
+
 //////////////////////////////////////////////////////////////////////////////
 // Layout for objects
 //////////////////////////////////////////////////////////////////////////////
