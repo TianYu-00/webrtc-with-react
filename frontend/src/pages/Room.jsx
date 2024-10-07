@@ -42,11 +42,19 @@ export default function Room({ socket, mySocketID }) {
   const iceCandidateBuffer = useRef([]);
 
   useEffect(() => {
-    const myAssignedName = location.state.name;
-    setMyName(myAssignedName);
+    const myAssignedName = location?.state?.name;
+
+    if (!myAssignedName || !roomID) {
+      console.log("redirecting to main page");
+      navigate(`/`, { replace: true });
+    } else {
+      setMyName(myAssignedName);
+    }
   }, [location.state]);
 
   useEffect(() => {
+    if (!myName) return;
+
     const configuration = {
       iceServers: [{ urls: "stun:stun1.google.com:19302" }],
     };
@@ -77,9 +85,11 @@ export default function Room({ socket, mySocketID }) {
     };
 
     return () => {};
-  }, []);
+  }, [myName]);
 
   useEffect(() => {
+    if (!myName) return;
+
     const getMediaStream = async () => {
       try {
         const constraints = {
@@ -117,10 +127,12 @@ export default function Room({ socket, mySocketID }) {
           socket.on("peer-is-ready", async ({ roomID }) => {
             console.log(`Peer is ready to accept in room ${roomID}`);
             setIsPeerReady(true);
+            socket.emit("get-peers-user-name", { roomID });
           });
         }
         if (!amIHost) {
           socket.emit("peer-ready-to-accept", { roomID });
+          socket.emit("get-peers-user-name", { roomID });
         }
       } catch (error) {
         console.error("Error accessing media devices:", error);
@@ -134,7 +146,7 @@ export default function Room({ socket, mySocketID }) {
         socket.off("peer-is-ready");
       }
     };
-  }, [selectedCamera, selectedAudioInput]);
+  }, [selectedCamera, selectedAudioInput, myName]);
 
   const processIceCandidates = async () => {
     for (const candidate of iceCandidateBuffer.current) {
@@ -155,6 +167,7 @@ export default function Room({ socket, mySocketID }) {
 
   useEffect(() => {
     // socket.on("peer-joined", async () => {});
+    if (!myName) return;
 
     socket.on("offer", async ({ offer }) => {
       console.log("Received offer for room:", offer);
@@ -195,13 +208,19 @@ export default function Room({ socket, mySocketID }) {
       }
     });
 
+    socket.on("receive-peers-user-name", ({ name }) => {
+      console.log("Peer name:", { name });
+      setPeerName(name);
+    });
+
     return () => {
       // socket.off("peer-joined");
       socket.off("offer");
       socket.off("answer");
       socket.off("ice-candidate");
+      socket.off("receive-peers-user-name");
     };
-  }, []);
+  }, [myName]);
 
   const createOffer = async () => {
     try {

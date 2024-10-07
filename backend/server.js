@@ -120,6 +120,22 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("get-peers-user-name", ({ roomID }) => {
+    const room = listOfRooms[roomID];
+
+    if (!room) {
+      console.log(`Room ${roomID} not found for get-peers-user-name.`);
+      return;
+    }
+
+    const peerID = socket.id !== room.socketIDHost ? room.socketIDHost : room.socketIDPeer;
+    const peer = listOfUsersInRoom[peerID];
+
+    if (peer) {
+      socket.emit("receive-peers-user-name", { name: peer.name });
+    }
+  });
+
   // handle offer
   socket.on("offer", ({ offer }) => {
     const user = listOfUsersInRoom[socket.id];
