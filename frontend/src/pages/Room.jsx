@@ -265,8 +265,71 @@ export default function Room({ socket, mySocketID }) {
     }
   }
 
+  const startScreenShare = async () => {
+    try {
+      const displayMediaStream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true,
+      });
+
+      myVideo.current.srcObject = displayMediaStream;
+
+      const displayVideoTrack = displayMediaStream.getVideoTracks()[0];
+
+      const existingSenders = rtcPeerConnection.current.getSenders();
+      const videoSender = existingSenders.find((sender) => sender.track.kind === "video");
+
+      if (videoSender) {
+        await videoSender.replaceTrack(displayVideoTrack);
+      } else {
+        rtcPeerConnection.current.addTrack(displayVideoTrack, displayMediaStream);
+      }
+
+      setIsScreenShare(true);
+
+      displayMediaStream.getTracks().forEach((track) => {
+        // handle built in control stop screen sharing
+        track.onended = () => {
+          const originalVideoTrack = stream.getVideoTracks()[0];
+          if (videoSender) {
+            videoSender.replaceTrack(originalVideoTrack);
+            myVideo.current.srcObject = stream;
+          }
+          setIsScreenShare(false);
+        };
+      });
+    } catch (error) {
+      console.error("Error starting screen share:", error);
+    }
+  };
+
+  const stopScreenShare = () => {
+    const displayMediaTracks = myVideo.current.srcObject?.getTracks();
+
+    if (displayMediaTracks) {
+      displayMediaTracks.forEach((track) => track.stop());
+    }
+
+    const originalVideoTrack = stream.getVideoTracks()[0];
+    const existingSenders = rtcPeerConnection.current.getSenders();
+    const videoSender = existingSenders.find((sender) => sender.track.kind === "video");
+
+    if (videoSender) {
+      videoSender.replaceTrack(originalVideoTrack);
+    }
+
+    myVideo.current.srcObject = stream;
+
+    setIsScreenShare(false);
+  };
+
   function Handle_ScreenShare() {
-    setIsScreenShare(!isScreenShare);
+    // https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getDisplayMedia
+    if (isScreenShare) {
+      stopScreenShare();
+    } else {
+      startScreenShare();
+    }
   }
 
   function Handle_Settings() {
@@ -364,23 +427,23 @@ export default function Room({ socket, mySocketID }) {
         {/* Screen Share */}
         {isScreenShare ? (
           <button
-            className="flex flex-col w-16 h-full justify-center items-center text-white"
-            onClick={() => {
-              Handle_ScreenShare();
-            }}
-          >
-            <MdScreenShare className="" size={30} />
-            <p className="p-1 text-xs">Share</p>
-          </button>
-        ) : (
-          <button
             className="flex flex-col w-16 h-full justify-center items-center text-red-500"
             onClick={() => {
               Handle_ScreenShare();
             }}
           >
-            <MdStopScreenShare className="" size={30} />
+            <MdScreenShare className="" size={30} />
             <p className="p-1 text-xs">Stop</p>
+          </button>
+        ) : (
+          <button
+            className="flex flex-col w-16 h-full justify-center items-center text-white"
+            onClick={() => {
+              Handle_ScreenShare();
+            }}
+          >
+            <MdStopScreenShare className="" size={30} />
+            <p className="p-1 text-xs">Share</p>
           </button>
         )}
 

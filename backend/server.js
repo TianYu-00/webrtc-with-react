@@ -236,6 +236,25 @@ server.listen(serverPort, () => {
 // guessing it should also work for screen sharing as well if i can get the screen with getDisplayMedia
 // https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getDisplayMedia
 
+// START screen Sharing steps:
+// get the display media stream (the screen to share)
+// set the local video element source object to the display media stream
+// retrieve the video track from the display media stream
+// check for existing video senders in the RTC peer connection
+// replace the video track if a sender exists, or add it if not
+// set the state to indicate that screen sharing has started so my button could update accordingly
+// handle the track ended event to revert back to the original video track if the stream ends
+
+// STOP screen sharing steps:
+// stop all tracks from the display media stream
+// retrieve the original video track from the local stream
+// check for existing video senders in the RTC peer connection
+// replace the display media track with the original video track
+// update the local video element's source object to the original stream
+// update the state to indicate that screen sharing has stopped so my button could update accordingly
+
+// note: need to make sure to handle browser built in stop and custom stop properly to make it work both ways.
+
 //////////////////////////////////////////////////////////////////////////////
 // Layout for objects
 //////////////////////////////////////////////////////////////////////////////
