@@ -127,10 +127,12 @@ export default function Room({ socket, mySocketID }) {
           socket.on("peer-is-ready", async ({ roomID }) => {
             console.log(`Peer is ready to accept in room ${roomID}`);
             setIsPeerReady(true);
+            socket.emit("get-peers-user-name", { roomID });
           });
         }
         if (!amIHost) {
           socket.emit("peer-ready-to-accept", { roomID });
+          socket.emit("get-peers-user-name", { roomID });
         }
       } catch (error) {
         console.error("Error accessing media devices:", error);
@@ -206,11 +208,17 @@ export default function Room({ socket, mySocketID }) {
       }
     });
 
+    socket.on("receive-peers-user-name", ({ name }) => {
+      console.log("Peer name:", { name });
+      setPeerName(name);
+    });
+
     return () => {
       // socket.off("peer-joined");
       socket.off("offer");
       socket.off("answer");
       socket.off("ice-candidate");
+      socket.off("receive-peers-user-name");
     };
   }, [myName]);
 
