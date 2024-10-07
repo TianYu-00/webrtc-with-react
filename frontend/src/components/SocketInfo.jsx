@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 
 export default function SocketInfo({ socket }) {
-  const [isHidden, setIsHidden] = useState(false);
+  const [isHidden, setIsHidden] = useState(true);
   // Sockets Related
   const [mySocketID, setMySocketID] = useState("");
   const [connectedUsers, setConnectedUsers] = useState(0);
