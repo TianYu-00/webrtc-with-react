@@ -7,6 +7,7 @@ import {
   BsTelephoneXFill,
   BsGearFill,
 } from "react-icons/bs";
+import { MdScreenShare, MdStopScreenShare } from "react-icons/md";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 
 export default function Room({ socket, mySocketID }) {
@@ -25,6 +26,7 @@ export default function Room({ socket, mySocketID }) {
   const [isVideoOn, setIsVideoOn] = useState(true);
   const [isMicOn, setIsMicOn] = useState(true);
   const [myName, setMyName] = useState("");
+  const [isScreenShare, setIsScreenShare] = useState(false);
 
   // devices
   const [selectedCamera, setSelectedCamera] = useState("");
@@ -263,6 +265,10 @@ export default function Room({ socket, mySocketID }) {
     }
   }
 
+  function Handle_ScreenShare() {
+    setIsScreenShare(!isScreenShare);
+  }
+
   function Handle_Settings() {
     setIsHideSettings(!isHideSettings);
   }
@@ -352,6 +358,29 @@ export default function Room({ socket, mySocketID }) {
           >
             <BsMicMuteFill className="p-1" size={30} />
             <p className="p-1 text-xs">Unmute</p>
+          </button>
+        )}
+
+        {/* Screen Share */}
+        {isScreenShare ? (
+          <button
+            className="flex flex-col w-16 h-full justify-center items-center text-white"
+            onClick={() => {
+              Handle_ScreenShare();
+            }}
+          >
+            <MdScreenShare className="" size={30} />
+            <p className="p-1 text-xs">Share</p>
+          </button>
+        ) : (
+          <button
+            className="flex flex-col w-16 h-full justify-center items-center text-red-500"
+            onClick={() => {
+              Handle_ScreenShare();
+            }}
+          >
+            <MdStopScreenShare className="" size={30} />
+            <p className="p-1 text-xs">Stop</p>
           </button>
         )}
 
