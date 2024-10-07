@@ -42,11 +42,19 @@ export default function Room({ socket, mySocketID }) {
   const iceCandidateBuffer = useRef([]);
 
   useEffect(() => {
-    const myAssignedName = location.state.name;
-    setMyName(myAssignedName);
+    const myAssignedName = location?.state?.name;
+
+    if (!myAssignedName || !roomID) {
+      console.log("redirecting to main page");
+      navigate(`/`, { replace: true });
+    } else {
+      setMyName(myAssignedName);
+    }
   }, [location.state]);
 
   useEffect(() => {
+    if (!myName) return;
+
     const configuration = {
       iceServers: [{ urls: "stun:stun1.google.com:19302" }],
     };
@@ -77,9 +85,11 @@ export default function Room({ socket, mySocketID }) {
     };
 
     return () => {};
-  }, []);
+  }, [myName]);
 
   useEffect(() => {
+    if (!myName) return;
+
     const getMediaStream = async () => {
       try {
         const constraints = {
@@ -134,7 +144,7 @@ export default function Room({ socket, mySocketID }) {
         socket.off("peer-is-ready");
       }
     };
-  }, [selectedCamera, selectedAudioInput]);
+  }, [selectedCamera, selectedAudioInput, myName]);
 
   const processIceCandidates = async () => {
     for (const candidate of iceCandidateBuffer.current) {
@@ -155,6 +165,7 @@ export default function Room({ socket, mySocketID }) {
 
   useEffect(() => {
     // socket.on("peer-joined", async () => {});
+    if (!myName) return;
 
     socket.on("offer", async ({ offer }) => {
       console.log("Received offer for room:", offer);
@@ -201,7 +212,7 @@ export default function Room({ socket, mySocketID }) {
       socket.off("answer");
       socket.off("ice-candidate");
     };
-  }, []);
+  }, [myName]);
 
   const createOffer = async () => {
     try {
