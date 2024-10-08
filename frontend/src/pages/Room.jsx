@@ -252,18 +252,27 @@ export default function Room({ socket, mySocketID }) {
     navigate(`/`);
   }
 
-  function Handle_Cam() {
-    setIsVideoOn(!isVideoOn);
+  const toggleMediaTrack = (trackType, isOn, stream) => {
     if (stream) {
-      stream.getVideoTracks()[0].enabled = !isVideoOn;
+      const track = trackType === "video" ? stream.getVideoTracks()[0] : stream.getAudioTracks()[0];
+      if (track) {
+        track.enabled = !isOn;
+      }
     }
+  };
+
+  function Handle_Cam() {
+    setIsVideoOn((prev) => {
+      toggleMediaTrack("video", prev, stream);
+      return !prev;
+    });
   }
 
   function Handle_Mic() {
-    setIsMicOn(!isMicOn);
-    if (stream) {
-      stream.getAudioTracks()[0].enabled = !isMicOn;
-    }
+    setIsMicOn((prev) => {
+      toggleMediaTrack("audio", prev, stream);
+      return !prev;
+    });
   }
 
   const startScreenShare = async () => {
