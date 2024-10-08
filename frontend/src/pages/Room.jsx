@@ -169,7 +169,6 @@ export default function Room({ socket, mySocketID }) {
   }, [isPeerReady]);
 
   useEffect(() => {
-    // socket.on("peer-joined", async () => {});
     if (!myName) return;
 
     socket.on("offer", async ({ offer }) => {
@@ -217,7 +216,6 @@ export default function Room({ socket, mySocketID }) {
     });
 
     return () => {
-      // socket.off("peer-joined");
       socket.off("offer");
       socket.off("answer");
       socket.off("ice-candidate");
