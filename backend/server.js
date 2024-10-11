@@ -28,7 +28,6 @@ io.on("connection", (socket) => {
   console.log(connectedCounter, "users online");
 
   socket.emit("me", socket.id);
-
   io.emit("all-users-connected", connectedCounter);
   io.emit("all-rooms", listOfRooms);
   io.emit("all-users", listOfUsersInRoom);
@@ -50,7 +49,6 @@ io.on("connection", (socket) => {
       };
       socket.join(roomID);
       io.emit("all-rooms", listOfRooms);
-      socket.emit("room-created", { roomID, isHost: true });
     } else {
       console.log("User not found");
     }
@@ -64,11 +62,6 @@ io.on("connection", (socket) => {
         socket.join(roomID);
         socket.emit("room-joined", { success: true, message: "Joined room." });
         io.emit("all-rooms", listOfRooms);
-
-        const hostSocketID = listOfRooms[roomID].socketIDHost;
-        if (hostSocketID) {
-          io.to(hostSocketID).emit("peer-joined");
-        }
       } else {
         socket.emit("room-full", { success: false, message: "Room is full." });
       }
