@@ -12,3 +12,6 @@
 - WebRTC
 - Socket.IO-Client
 - React-Icons
+
+## Note
+- Markdown needs to be completed
