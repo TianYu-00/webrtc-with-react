@@ -1,4 +1,5 @@
 # WebRTC with React
+A real-time communication platform with video, audio, and screen sharing, built with Node.js, Express, Socket.IO, WebRTC, and a React frontend styled with Tailwind CSS.
 ![image](https://github.com/user-attachments/assets/9a4def6c-4ce3-4ede-997d-25565e178c79)
 
 - Landing Page (_)
